@@ -2,7 +2,7 @@
 
 將 **txt2img / img2img** 的 **Generation**（參數與畫廊）固定在左側，**Checkpoints、LoRA、Textual Inversion** 等 Extra Networks 獨立在右側，減少分頁切換、提升選模效率。
 
-專為 **[Stable Diffusion WebUI Forge - Neo](https://github.com/Haoming02/Stable-Diffusion-Webui-Forge-Neo)** 設計。
+專為 [Stable Diffusion WebUI Forge - Neo] 設計。
 
 ![Split layout preview](preview.png)
 
