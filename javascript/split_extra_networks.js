@@ -8,7 +8,7 @@ const FORGE_EN_DEFAULT_RIGHT_WIDTH = 520;
 const FORGE_EN_MIN_RIGHT_WIDTH = 280;
 const FORGE_EN_MAX_RIGHT_WIDTH = 1200;
 const FORGE_EN_WIDTH_STORAGE_PREFIX = "forge_en_split_width_";
-const FORGE_EN_DEFAULT_TAB_SUFFIX = "_lora";
+const FORGE_EN_DEFAULT_TAB_SUFFIX_FALLBACK = "_output_browser";
 
 let forgeEnResizeListenersAttached = false;
 
@@ -237,8 +237,16 @@ function forgeEnSplitEnsureResizeHandle(splitRoot, tabname) {
     });
 }
 
+function forgeEnSplitDefaultTabSuffix() {
+    const slug =
+        typeof opts !== "undefined" && opts.forge_en_split_default_extra_tab
+            ? String(opts.forge_en_split_default_extra_tab).trim()
+            : "output_browser";
+    return "_" + slug.replace(/\s+/g, "_");
+}
+
 function forgeEnSplitSelectDefaultTab(splitRoot, tabname) {
-    const preferredId = tabname + FORGE_EN_DEFAULT_TAB_SUFFIX;
+    const preferredId = tabname + forgeEnSplitDefaultTabSuffix();
     let btn = splitRoot.querySelector(
         '.tab-nav button[aria-controls="' + preferredId + '"]',
     );

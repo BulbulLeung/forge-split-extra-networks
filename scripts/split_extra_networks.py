@@ -1,12 +1,15 @@
 import gradio as gr
 import os
+import sys
 
-from modules import script_callbacks, scripts, shared
+from modules import script_callbacks, scripts, shared, ui_extra_networks
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_EXT_JS = os.path.normpath(
-    os.path.join(_EXT_DIR, "javascript", "split_extra_networks.js")
-)
+if _EXT_DIR not in sys.path:
+    sys.path.insert(0, _EXT_DIR)
+
+_EXT_JS_DIR = os.path.join(_EXT_DIR, "javascript")
+_EXT_JS_FILES = ("split_extra_networks.js", "output_browser.js")
 
 shared.options_templates.update(
     shared.options_section(
@@ -26,9 +29,42 @@ shared.options_templates.update(
                 True,
                 "Remember panel width after resize (localStorage)",
             ),
+            "forge_en_output_browser_enabled": shared.OptionInfo(
+                True,
+                "Show Output Browser tab in Extra Networks",
+            ).needs_reload_ui(),
+            "forge_en_output_browser_max_items": shared.OptionInfo(
+                500,
+                "Output Browser: maximum number of images to list",
+                gr.Slider,
+                {"minimum": 100, "maximum": 5000, "step": 50},
+            ),
+            "forge_en_extra_networks_tab_order": shared.OptionInfo(
+                "output browser,lora,checkpoints,textual inversion",
+                "Extra Networks tab order (comma-separated page names)",
+            ).needs_reload_ui(),
+            "forge_en_split_default_extra_tab": shared.OptionInfo(
+                "output_browser",
+                "Default Extra Networks tab on startup",
+                gr.Dropdown,
+                lambda: {
+                    "choices": [
+                        "output_browser",
+                        "lora",
+                        "checkpoints",
+                        "textual_inversion",
+                    ]
+                },
+            ).needs_reload_ui(),
         },
     )
 )
+
+
+def _apply_extra_networks_tab_order():
+    order = (shared.opts.forge_en_extra_networks_tab_order or "").strip()
+    if order:
+        shared.opts.ui_extra_networks_tab_reorder = order
 
 
 def _ensure_js_in_javascript_html():
@@ -43,25 +79,41 @@ def _ensure_js_in_javascript_html():
 
     def wrapped_javascript_html():
         html = original()
-        if "split_extra_networks.js" in html:
-            return html
-        if os.path.isfile(_EXT_JS):
-            html += (
-                f'<script type="text/javascript" src="{uge.webpath(_EXT_JS)}"></script>\n'
-            )
+        for js_name in _EXT_JS_FILES:
+            if js_name in html:
+                continue
+            js_path = os.path.normpath(os.path.join(_EXT_JS_DIR, js_name))
+            if os.path.isfile(js_path):
+                html += (
+                    f'<script type="text/javascript" src="{uge.webpath(js_path)}"></script>\n'
+                )
         return html
 
     uge.javascript_html = wrapped_javascript_html
 
 
+def _register_output_browser():
+    if not shared.opts.forge_en_output_browser_enabled:
+        return
+    from ui_extra_networks_output_browser import ExtraNetworksPageOutputBrowser
+
+    ui_extra_networks.register_page(ExtraNetworksPageOutputBrowser())
+
+
+def _on_before_ui():
+    _ensure_js_in_javascript_html()
+    _apply_extra_networks_tab_order()
+    _register_output_browser()
+
+
 script_callbacks.on_before_ui(
-    _ensure_js_in_javascript_html,
-    name="forge-split-extra-networks-js-patch",
+    _on_before_ui,
+    name="forge-split-extra-networks",
 )
 
 
 class SplitExtraNetworksLayout(scripts.Script):
-    """Registers settings only; layout is applied via javascript/split_extra_networks.js."""
+    """Registers settings and Output Browser EN page; layout via javascript."""
 
     def title(self):
         return "Split Extra Networks layout"

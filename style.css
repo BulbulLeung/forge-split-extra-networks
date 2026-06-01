@@ -151,3 +151,103 @@
         grid-row: 3;
     }
 }
+
+/* Output Browser: hide model metadata editor on output images */
+#txt2img_output_browser_cards .edit-button,
+#img2img_output_browser_cards .edit-button {
+    display: none !important;
+}
+
+/* Output Browser: single-click selection highlight */
+#txt2img_output_browser_cards .card.forge-en-output-selected,
+#img2img_output_browser_cards .card.forge-en-output-selected {
+    outline: 3px solid var(--color-accent, #4a9eff);
+    outline-offset: -2px;
+    box-shadow: 0 0 12px rgba(74, 158, 255, 0.45);
+}
+
+#txt2img_output_browser_cards .card,
+#img2img_output_browser_cards .card {
+    cursor: default;
+}
+
+/* Output Browser: single-image preview (no gallery loop / tiled fullscreen) */
+.forge-en-output-lightbox {
+    display: none;
+    position: fixed;
+    z-index: 1002;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(20, 20, 20, 0.95);
+    user-select: none;
+}
+
+.forge-en-output-lightbox-close {
+    position: absolute;
+    top: 0.5em;
+    right: 0.6em;
+    z-index: 1;
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 2.5rem;
+    line-height: 1;
+    cursor: pointer;
+    text-shadow: 0 0 0.25em #000;
+}
+
+.forge-en-output-lightbox-close:hover {
+    color: #bbb;
+}
+
+.forge-en-output-lightbox-img {
+    display: block;
+    max-width: min(95vw, 100%);
+    max-height: min(95vh, 100%);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Output Browser: right-click context menu */
+.forge-en-output-context-menu {
+    display: none;
+    position: fixed;
+    z-index: 1003;
+    min-width: 11rem;
+    padding: 0.35rem 0;
+    border-radius: 6px;
+    background: var(--body-background-fill, #2b2b2b);
+    border: 1px solid var(--border-color-primary, #555);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.forge-en-output-context-menu button {
+    display: block;
+    width: 100%;
+    padding: 0.45rem 0.85rem;
+    border: none;
+    background: transparent;
+    color: var(--body-text-color, #eee);
+    text-align: left;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.forge-en-output-context-menu button:hover:not(:disabled) {
+    background: var(--background-fill-secondary, #3a3a3a);
+}
+
+.forge-en-output-context-menu button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.forge-en-output-context-menu button.forge-en-output-context-menu-danger {
+    color: #ff8a8a;
+}
+
+.forge-en-output-context-menu button.forge-en-output-context-menu-danger:hover:not(:disabled) {
+    background: rgba(180, 40, 40, 0.35);
+}
