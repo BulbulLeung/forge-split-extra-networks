@@ -29,6 +29,12 @@ shared.options_templates.update(
                 True,
                 "Remember panel width after resize (localStorage)",
             ),
+            "forge_en_split_pane_viewport_offset_px": shared.OptionInfo(
+                320,
+                "Extra Networks preview pane: viewport offset (px)",
+                gr.Slider,
+                {"minimum": 80, "maximum": 600, "step": 8},
+            ),
             "forge_en_output_browser_enabled": shared.OptionInfo(
                 True,
                 "Show Output Browser tab in Extra Networks",
@@ -38,6 +44,12 @@ shared.options_templates.update(
                 "Output Browser: maximum number of images to list",
                 gr.Slider,
                 {"minimum": 100, "maximum": 5000, "step": 50},
+            ),
+            "forge_en_output_browser_selection_outline_px": shared.OptionInfo(
+                5,
+                "Output Browser: selection outline width (px)",
+                gr.Slider,
+                {"minimum": 1, "maximum": 12, "step": 1},
             ),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
                 "output browser,lora,checkpoints,textual inversion",

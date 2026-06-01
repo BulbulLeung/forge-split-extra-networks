@@ -9,6 +9,9 @@ const FORGE_EN_MIN_RIGHT_WIDTH = 280;
 const FORGE_EN_MAX_RIGHT_WIDTH = 1200;
 const FORGE_EN_WIDTH_STORAGE_PREFIX = "forge_en_split_width_";
 const FORGE_EN_DEFAULT_TAB_SUFFIX_FALLBACK = "_output_browser";
+const FORGE_EN_DEFAULT_PANE_VIEWPORT_OFFSET_PX = 320;
+const FORGE_EN_MIN_PANE_OFFSET_PX = 80;
+const FORGE_EN_MAX_PANE_OFFSET_PX = 600;
 
 let forgeEnResizeListenersAttached = false;
 
@@ -39,6 +42,39 @@ function forgeEnSplitGetStoredWidth(tabname) {
     return Math.max(
         FORGE_EN_MIN_RIGHT_WIDTH,
         Math.min(FORGE_EN_MAX_RIGHT_WIDTH, n),
+    );
+}
+
+function forgeEnSplitClampPaneOffsetPx(value, fallback) {
+    const n =
+        typeof value === "number"
+            ? value
+            : parseInt(value, 10);
+    if (Number.isNaN(n)) return fallback;
+    return Math.max(
+        FORGE_EN_MIN_PANE_OFFSET_PX,
+        Math.min(FORGE_EN_MAX_PANE_OFFSET_PX, Math.round(n)),
+    );
+}
+
+function forgeEnSplitPaneViewportOffsetPx() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.forge_en_split_pane_viewport_offset_px != null
+    ) {
+        return forgeEnSplitClampPaneOffsetPx(
+            opts.forge_en_split_pane_viewport_offset_px,
+            FORGE_EN_DEFAULT_PANE_VIEWPORT_OFFSET_PX,
+        );
+    }
+    return FORGE_EN_DEFAULT_PANE_VIEWPORT_OFFSET_PX;
+}
+
+function forgeEnSplitApplyPaneOffsets(splitRoot) {
+    if (!splitRoot) return;
+    splitRoot.style.setProperty(
+        "--forge-en-pane-offset-px",
+        forgeEnSplitPaneViewportOffsetPx() + "px",
     );
 }
 
@@ -279,6 +315,7 @@ function forgeEnSplitApplyLayout(tabname) {
         outer.classList.contains("forge-en-split-outer")
     ) {
         forgeEnSplitRemoveGenerationTab(outer, splitRoot, tabname, genPanel);
+        forgeEnSplitApplyPaneOffsets(splitRoot);
         return;
     }
 
@@ -301,6 +338,7 @@ function forgeEnSplitApplyLayout(tabname) {
         tabname,
         stored !== null ? stored : forgeEnSplitDefaultWidth(),
     );
+    forgeEnSplitApplyPaneOffsets(splitRoot);
     forgeEnSplitEnsureResizeHandle(splitRoot, tabname);
 
     forgeEnSplitApplied[tabname] = true;

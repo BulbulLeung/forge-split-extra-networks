@@ -55,12 +55,14 @@
 | Enable split layout | 啟用／停用雙欄版面 | 啟用 |
 | Default Extra Networks panel width | 右欄預設寬度（px） | 520 |
 | Remember panel width after resize | 拖曳後是否記住寬度 | 啟用 |
+| Extra Networks preview pane: viewport offset (px) | 右欄縮圖預覽區相對視窗的垂直留白（px）；數值越大，面板越矮 | 320 |
 | Show Output Browser tab in Extra Networks | 是否顯示 Output Browser 分頁 | 啟用 |
 | Output Browser: maximum number of images to list | 列表最多顯示幾張圖（依修改時間取最新） | 500 |
+| Output Browser: selection outline width (px) | 單擊選取縮圖時的高亮邊線粗度 | 5 |
 | Extra Networks tab order | 右欄分頁順序（逗號分隔） | output browser,lora,checkpoints,textual inversion |
 | Default Extra Networks tab on startup | 啟動時預設開啟的分頁 | output_browser |
 
-變更「啟用」、Output Browser 或預設寬度後，建議執行 **Reload UI**。
+變更「啟用」、Output Browser 或預設寬度後，建議執行 **Reload UI**。預覽區 viewport offset（px）變更後通常會立即生效；若未見效果可 **Reload UI**。
 
 ### Output Browser
 
@@ -74,7 +76,7 @@
 
 #### 操作
 
-- **單擊**卡片：高亮選取（類似檔案總管）；**Ctrl+單擊**切換選取、**Shift+單擊**從錨點連續選取；**Ctrl+Shift+單擊**在保留既有選取下追加範圍。
+- **單擊**卡片：高亮選取（類似檔案總管，邊線粗度可在設定調整）；**Ctrl+單擊**切換選取、**Shift+單擊**從錨點連續選取；**Ctrl+Shift+單擊**在保留既有選取下追加範圍。
 - **雙擊**卡片：以單圖預覽層顯示大圖；**Esc** 或點背景／關閉鈕可關閉預覽。
 - **右鍵**卡片：功能選單
   - **Send to txt2img** / **Send to img2img**：讀取**右鍵那張**圖的 PNG info，寫入對應分頁欄位並自動切換主分頁（僅單張）。

@@ -9,6 +9,34 @@ const FORGE_EN_OUTPUT_BROWSER_CARD_IDS = [
 ];
 
 const FORGE_EN_OUTPUT_SELECTED_CLASS = "forge-en-output-selected";
+const FORGE_EN_OUTPUT_SELECTION_OUTLINE_DEFAULT_PX = 5;
+const FORGE_EN_OUTPUT_SELECTION_OUTLINE_MIN_PX = 1;
+const FORGE_EN_OUTPUT_SELECTION_OUTLINE_MAX_PX = 12;
+
+function forgeEnOutputBrowserSelectionOutlinePx() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.forge_en_output_browser_selection_outline_px != null
+    ) {
+        const n = parseInt(opts.forge_en_output_browser_selection_outline_px, 10);
+        if (!Number.isNaN(n)) {
+            return Math.max(
+                FORGE_EN_OUTPUT_SELECTION_OUTLINE_MIN_PX,
+                Math.min(FORGE_EN_OUTPUT_SELECTION_OUTLINE_MAX_PX, n),
+            );
+        }
+    }
+    return FORGE_EN_OUTPUT_SELECTION_OUTLINE_DEFAULT_PX;
+}
+
+function forgeEnOutputBrowserApplySelectionStyle() {
+    const root = gradioApp();
+    if (!root) return;
+    root.style.setProperty(
+        "--forge-en-output-selection-outline-width",
+        forgeEnOutputBrowserSelectionOutlinePx() + "px",
+    );
+}
 
 const FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER = {
     txt2img_output_browser_cards: "txt2img",
@@ -608,6 +636,7 @@ function forgeEnOutputBrowserShowContextMenu(event, container, containerId) {
 }
 
 function forgeEnOutputBrowserBindCardInteractions() {
+    forgeEnOutputBrowserApplySelectionStyle();
     forgeEnOutputBrowserEnsureKeyListener();
 
     for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
