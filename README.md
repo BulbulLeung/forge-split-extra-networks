@@ -1,10 +1,12 @@
 # Forge Split Extra Networks
 
-將 **txt2img / img2img** 的 **Generation**（參數與畫廊）固定在左側，**Checkpoints、LoRA、Textual Inversion** 等 Extra Networks 獨立在右側，減少分頁切換、提升選模效率。
+將 **txt2img / img2img** 的 **Generation** 固定在左側，**Checkpoints、LoRA、Textual Inversion** 等 Extra Networks 獨立在右側，減少分頁切換、提升選模效率。內建 **Output Browser**，可在同一畫面瀏覽歷史輸出、套用 PNG info、刪除檔案，無需離開 txt2img / img2img。
 
-專為 [Stable Diffusion WebUI Forge - Neo] 設計。
+專為 Stable Diffusion WebUI Forge - Neo 設計。
 
-![Split layout preview](preview.png)
+![Split layout with Output Browser](preview.png)
+
+*預覽：左側為 Generation；右側 Extra Networks 的 **Output Browser** 分頁（搜尋列、txt2img / img2img 篩選、縮圖網格與右鍵選單）。*
 
 ---
 
@@ -13,9 +15,8 @@
 | 項目 | 說明 |
 |------|------|
 | 左欄常駐 Generation | 採樣、尺寸、Seed、腳本與畫廊始終可見 |
-| 右欄 Extra Networks | Checkpoints、LoRA、Textual Inversion 等分頁集中在右側 |
-| Output Browser | 瀏覽 Settings 中設定的輸出目錄（samples）內圖片，卡片縮圖、單擊 Lightbox 大圖預覽 |
-| 可拖曳調整寬度 | 中間把手拖曳改變右欄寬度，雙擊恢復預設 |
+| 右欄 Extra Networks | Checkpoints、LoRA、Textual Inversion、Output Browser 等分頁集中在右側 |
+| Output Browser | 瀏覽輸出目錄內圖片；縮圖網格與路徑標籤；**單擊**多選、**雙擊**大圖預覽、**右鍵**送參／刪除 |
 | 記住寬度 | 可選將寬度存入瀏覽器 `localStorage` |
 | 非侵入式 | 僅安裝於 `extensions/`，不覆寫 `modules/`、`style.css` 等核心檔 |
 
@@ -48,6 +49,7 @@
 ## 設定
 
 **Settings → Split Extra Networks layout**
+
 | 選項 | 說明 | 預設 |
 |------|------|------|
 | Enable split layout | 啟用／停用雙欄版面 | 啟用 |
@@ -62,16 +64,22 @@
 
 ### Output Browser
 
-- **txt2img** 分頁：掃描 `outdir_samples`（若已設定）或 **Output Directory for txt2img Images**。
-- **img2img** 分頁：掃描 `outdir_samples` 或 **Output Directory for img2img Images**。
-- 上部固定顯示 **txt2img**、**img2img** 兩個按鈕（對應 Settings 中各分頁的 samples 輸出路徑，不受全域 `outdir_samples` 影響）。
-- 點選 **txt2img** 或 **img2img** 後，下方顯示該目錄及其**所有子資料夾**內的圖片（遞迴掃描）；不含 grids 目錄。
+#### 介面
+
+- **位置**：txt2img / img2img → 右側 Extra Networks → **Output Browser** 分頁（可於設定調整分頁順序與啟動預設）。
+- **搜尋列**：依檔名、相對路徑、`txt2img/…` 等關鍵字篩選（沿用 Extra Networks 搜尋）。
+- **工具列**：名稱／日期排序、日期篩選、**Refresh**（與 LoRA 等分頁相同，重新掃描列表）。
+- **txt2img / img2img 按鈕**：快速篩選該模式的輸出（對應 Settings 內各分頁的 samples 路徑）。
+- **縮圖卡片**：底部顯示相對路徑（例如 `txt2img/2026-02-28/0273-1108391704.png`）。
+
+#### 操作
+
 - **單擊**卡片：高亮選取（類似檔案總管）；**Ctrl+單擊**切換選取、**Shift+單擊**從錨點連續選取；**Ctrl+Shift+單擊**在保留既有選取下追加範圍。
 - **雙擊**卡片：以單圖預覽層顯示大圖；**Esc** 或點背景／關閉鈕可關閉預覽。
 - **右鍵**卡片：功能選單
-  - **Send to txt2img** / **Send to img2img**：將**右鍵那張**圖的 PNG info 套用至對應分頁參數並自動切換分頁，僅單張。
+  - **Send to txt2img** / **Send to img2img**：讀取**右鍵那張**圖的 PNG info，寫入對應分頁欄位並自動切換主分頁（僅單張）。
   - **Delete**：刪除**目前選取**的圖片（無選取時刪右鍵那張）；刪除前會跳出確認對話框。
-  - **Delete 鍵**：在 Output Browser 已選取圖片時，按鍵盤 **Del** 與右鍵 Delete 相同（在輸入框內打字時不會觸發）。
+- **Delete 鍵**：在 Output Browser 已選取圖片時，按鍵盤 **Del** 與右鍵 Delete 相同（在輸入框內打字時不會觸發）。
 - 新增或變更輸出圖後，在 Extra Networks 面板點 **Refresh** 更新列表。
 
 ## 目錄結構
@@ -90,6 +98,7 @@ forge-split-extra-networks/
     ├── split_extra_networks.py   # 設定項與 Output Browser 註冊
     └── output_browser_api.py     # infotext / delete API
 ```
+
 ## 卸載
 
 刪除 `extensions/forge-split-extra-networks` 資料夾後重新啟動 WebUI 即可，不會殘留對核心檔的修改。
