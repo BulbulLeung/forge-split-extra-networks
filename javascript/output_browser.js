@@ -78,6 +78,9 @@ let forgeEnActiveDropTarget = null;
 let forgeEnContextMenuEl = null;
 let forgeEnContextMenuState = null;
 
+const forgeEnOutputScrollRestore = Object.create(null);
+let forgeEnLightboxState = null;
+
 function forgeEnOutputBrowserEnsureLightbox() {
     let overlay = gradioApp().querySelector("#forgeEnOutputLightbox");
     if (overlay) {
@@ -119,6 +122,12 @@ function forgeEnOutputBrowserCloseLightbox() {
     if (overlay) {
         overlay.style.display = "none";
     }
+    forgeEnLightboxState = null;
+}
+
+function forgeEnOutputBrowserIsLightboxOpen() {
+    const overlay = gradioApp().querySelector("#forgeEnOutputLightbox");
+    return !!(overlay && overlay.style.display !== "none");
 }
 
 function forgeEnOutputBrowserCloseContextMenu() {
@@ -187,13 +196,39 @@ function forgeEnOutputBrowserKeyHandler(event) {
             return;
         }
 
-        const overlay = gradioApp().querySelector("#forgeEnOutputLightbox");
-        if (overlay && overlay.style.display !== "none") {
+        if (forgeEnOutputBrowserIsLightboxOpen()) {
             forgeEnOutputBrowserCloseLightbox();
             event.preventDefault();
             event.stopPropagation();
         }
         return;
+    }
+
+    if (forgeEnOutputBrowserIsLightboxOpen()) {
+        if (forgeEnOutputBrowserIsEditableTarget(event.target)) {
+            return;
+        }
+
+        if (event.key === "ArrowLeft") {
+            forgeEnOutputBrowserNavigateLightbox(-1);
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        if (event.key === "ArrowRight") {
+            forgeEnOutputBrowserNavigateLightbox(1);
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        if (event.key === "Delete" || event.key === "Del") {
+            forgeEnOutputBrowserDeleteFromLightbox();
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
     }
 
     if (event.key === "Delete" || event.key === "Del") {
@@ -205,14 +240,6 @@ function forgeEnOutputBrowserKeyHandler(event) {
             event.stopPropagation();
         }
     }
-}
-
-function forgeEnOutputBrowserOpenPreview(previewUrl) {
-    const overlay = forgeEnOutputBrowserEnsureLightbox();
-    const img = overlay.querySelector(".forge-en-output-lightbox-img");
-    img.src = previewUrl;
-    overlay.style.display = "flex";
-    return false;
 }
 
 function forgeEnOutputBrowserGetCardPath(card) {
@@ -252,6 +279,192 @@ function forgeEnOutputBrowserParseJsonResponse(response) {
 
 function forgeEnOutputBrowserGetCards(container) {
     return Array.from(container.querySelectorAll(".card"));
+}
+
+function forgeEnOutputBrowserContainerIdForTab(tabname) {
+    return tabname + "_output_browser_cards";
+}
+
+function forgeEnOutputBrowserGetCardsScrollElement(container) {
+    return container || null;
+}
+
+function forgeEnOutputBrowserSaveScroll(containerId) {
+    const container = gradioApp().querySelector("#" + containerId);
+    const scrollEl = forgeEnOutputBrowserGetCardsScrollElement(container);
+    if (scrollEl) {
+        forgeEnOutputScrollRestore[containerId] = scrollEl.scrollTop;
+    }
+}
+
+function forgeEnOutputBrowserApplyScroll(containerId) {
+    const saved = forgeEnOutputScrollRestore[containerId];
+    if (saved == null) {
+        return false;
+    }
+
+    const container = gradioApp().querySelector("#" + containerId);
+    const scrollEl = forgeEnOutputBrowserGetCardsScrollElement(container);
+    if (!scrollEl || !container.querySelector(".card")) {
+        return false;
+    }
+
+    scrollEl.scrollTop = saved;
+    return true;
+}
+
+function forgeEnOutputBrowserScheduleScrollRestore(containerId) {
+    if (forgeEnOutputScrollRestore[containerId] == null) {
+        return;
+    }
+
+    let observer = null;
+    let finished = false;
+    const restoreDelaysMs = [0, 50, 100, 200, 400, 800, 1200, 2000];
+
+    function cleanup() {
+        if (finished) {
+            return;
+        }
+        finished = true;
+        if (observer) {
+            observer.disconnect();
+            observer = null;
+        }
+        delete forgeEnOutputScrollRestore[containerId];
+    }
+
+    function tryApply() {
+        if (finished) {
+            return;
+        }
+        forgeEnOutputBrowserApplyScroll(containerId);
+    }
+
+    const container = gradioApp().querySelector("#" + containerId);
+    if (container) {
+        observer = new MutationObserver(function () {
+            tryApply();
+        });
+        observer.observe(container, { childList: true, subtree: true });
+    }
+
+    restoreDelaysMs.forEach(function (delayMs) {
+        setTimeout(tryApply, delayMs);
+    });
+    setTimeout(cleanup, 2500);
+}
+
+function forgeEnOutputBrowserScheduleAfterRefresh(containerId, callback) {
+    let attempts = 0;
+
+    function tryCallback() {
+        const container = gradioApp().querySelector("#" + containerId);
+        if (!container) {
+            return;
+        }
+        if (!container.querySelector(".card")) {
+            if (attempts++ < 40) {
+                requestAnimationFrame(tryCallback);
+            } else {
+                callback(container);
+            }
+            return;
+        }
+        callback(container);
+    }
+
+    requestAnimationFrame(tryCallback);
+    setTimeout(tryCallback, 100);
+    setTimeout(tryCallback, 500);
+}
+
+function forgeEnOutputBrowserBuildLightboxEntries(container) {
+    const entries = [];
+    forgeEnOutputBrowserGetCards(container).forEach(function (card) {
+        const preview = card.querySelector("img.preview");
+        if (!preview || !preview.src) {
+            return;
+        }
+        entries.push({
+            previewUrl: preview.src,
+            path: forgeEnOutputBrowserGetCardPath(card),
+        });
+    });
+    return entries;
+}
+
+function forgeEnOutputBrowserOpenPreviewAtIndex(container, index) {
+    if (!container) {
+        return;
+    }
+
+    const entries = forgeEnOutputBrowserBuildLightboxEntries(container);
+    if (!entries.length) {
+        forgeEnOutputBrowserCloseLightbox();
+        return;
+    }
+
+    const i = Math.max(0, Math.min(index, entries.length - 1));
+    forgeEnLightboxState = {
+        containerId: container.id,
+        index: i,
+        entries: entries,
+    };
+
+    const overlay = forgeEnOutputBrowserEnsureLightbox();
+    const img = overlay.querySelector(".forge-en-output-lightbox-img");
+    img.src = entries[i].previewUrl;
+    overlay.style.display = "flex";
+}
+
+function forgeEnOutputBrowserNavigateLightbox(delta) {
+    if (!forgeEnLightboxState || !forgeEnLightboxState.entries) {
+        return;
+    }
+
+    const container = gradioApp().querySelector(
+        "#" + forgeEnLightboxState.containerId,
+    );
+    if (!container) {
+        return;
+    }
+
+    const newIndex = forgeEnLightboxState.index + delta;
+    if (newIndex < 0 || newIndex >= forgeEnLightboxState.entries.length) {
+        return;
+    }
+
+    forgeEnOutputBrowserOpenPreviewAtIndex(container, newIndex);
+}
+
+function forgeEnOutputBrowserDeleteFromLightbox() {
+    if (!forgeEnLightboxState || !forgeEnLightboxState.entries) {
+        return;
+    }
+
+    const state = forgeEnLightboxState;
+    const entry = state.entries[state.index];
+    if (!entry || !entry.path) {
+        return;
+    }
+
+    const tabname =
+        FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER[state.containerId] ||
+        forgeEnOutputBrowserGetVisibleMainTab();
+    const resumeIndex = state.index;
+
+    forgeEnOutputBrowserPerformDelete([entry.path], tabname, function (container) {
+        const entries = forgeEnOutputBrowserBuildLightboxEntries(container);
+        if (!entries.length) {
+            forgeEnOutputBrowserCloseLightbox();
+            return;
+        }
+        forgeEnOutputBrowserOpenPreviewAtIndex(
+            container,
+            Math.min(resumeIndex, entries.length - 1),
+        );
+    });
 }
 
 function forgeEnOutputBrowserClearSelection(container) {
@@ -344,15 +557,30 @@ function forgeEnOutputBrowserHandleCardDoubleClick(event, container) {
 
     event.preventDefault();
     event.stopPropagation();
-    forgeEnOutputBrowserOpenPreview(preview.src);
+
+    const cards = forgeEnOutputBrowserGetCards(container);
+    const index = cards.indexOf(card);
+    if (index < 0) {
+        return;
+    }
+    forgeEnOutputBrowserOpenPreviewAtIndex(container, index);
 }
 
-function forgeEnOutputBrowserRefreshPane(tabname) {
+function forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh) {
+    const containerId = forgeEnOutputBrowserContainerIdForTab(tabname);
+    forgeEnOutputBrowserSaveScroll(containerId);
+
     const btn = gradioApp().getElementById(
         tabname + "_output_browser_extra_refresh_internal",
     );
     if (btn) {
         btn.dispatchEvent(new Event("click"));
+    }
+
+    forgeEnOutputBrowserScheduleScrollRestore(containerId);
+
+    if (typeof onAfterRefresh === "function") {
+        forgeEnOutputBrowserScheduleAfterRefresh(containerId, onAfterRefresh);
     }
 }
 
@@ -467,16 +695,20 @@ function forgeEnOutputBrowserSendToTab(targetTab, filepath) {
         });
 }
 
-function forgeEnOutputBrowserDeletePaths(paths, tabname) {
+function forgeEnOutputBrowserPerformDelete(paths, tabname, onAfterRefresh) {
     if (!paths.length) {
         return;
     }
+
+    const containerId = forgeEnOutputBrowserContainerIdForTab(tabname);
+    forgeEnOutputBrowserSaveScroll(containerId);
 
     const message =
         "確定要刪除 " +
         paths.length +
         " 張圖片嗎？\n此操作無法復原。";
     if (!confirm(message)) {
+        delete forgeEnOutputScrollRestore[containerId];
         return;
     }
 
@@ -494,7 +726,7 @@ function forgeEnOutputBrowserDeletePaths(paths, tabname) {
                 }
             }
 
-            forgeEnOutputBrowserRefreshPane(tabname);
+            forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh);
 
             if (data.failed && data.failed.length > 0) {
                 const lines = data.failed
@@ -515,6 +747,10 @@ function forgeEnOutputBrowserDeletePaths(paths, tabname) {
         .catch(function (err) {
             alert("刪除失敗：" + err.message);
         });
+}
+
+function forgeEnOutputBrowserDeletePaths(paths, tabname) {
+    forgeEnOutputBrowserPerformDelete(paths, tabname, null);
 }
 
 function forgeEnOutputBrowserGetDeletePaths(container, contextCard) {
@@ -1011,10 +1247,32 @@ function forgeEnOutputBrowserBindCardInteractions() {
     }
 }
 
+function forgeEnOutputBrowserBindRefreshScrollPreserve() {
+    for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
+        const tabname = FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER[containerId];
+        const refreshBtn = gradioApp().getElementById(
+            tabname + "_output_browser_extra_refresh",
+        );
+        if (!refreshBtn || refreshBtn.dataset.forgeEnScrollPreserve === "1") {
+            continue;
+        }
+        refreshBtn.dataset.forgeEnScrollPreserve = "1";
+        refreshBtn.addEventListener(
+            "click",
+            function () {
+                forgeEnOutputBrowserSaveScroll(containerId);
+                forgeEnOutputBrowserScheduleScrollRestore(containerId);
+            },
+            true,
+        );
+    }
+}
+
 function forgeEnOutputBrowserInit() {
     forgeEnOutputBrowserBindCardInteractions();
     forgeEnOutputBrowserSetupCardDraggable();
     forgeEnOutputBrowserEnsureDropHandlers();
+    forgeEnOutputBrowserBindRefreshScrollPreserve();
 }
 
 if (typeof onUiUpdate === "function") {
