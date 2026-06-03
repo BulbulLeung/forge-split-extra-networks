@@ -43,6 +43,38 @@ const FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER = {
     img2img_output_browser_cards: "img2img",
 };
 
+const FORGE_EN_OUTPUT_PATH_MIME = "application/x-forge-en-output-path";
+const FORGE_EN_OUTPUT_PREVIEW_URL_MIME =
+    "application/x-forge-en-output-preview-url";
+
+const FORGE_EN_OUTPUT_IMG2IMG_CANVAS_SELECTORS = [
+    "#img2img_image",
+    "#img2img_sketch",
+    "#img2maskimg",
+    "#inpaint_sketch",
+];
+
+const FORGE_EN_OUTPUT_DROP_TARGETS = {
+    txt2img: [
+        "#txt2img_generation",
+        "#txt2img_prompt",
+        "#txt2img_neg_prompt",
+        "#txt2img_prompt_container",
+        "#txt2img_gallery_container",
+        "#txt2img_gallery",
+    ],
+    img2img: [
+        "#img2img_generation",
+        "#img2img_prompt",
+        "#img2img_neg_prompt",
+        "#img2img_prompt_container",
+        "#img2img_gallery_container",
+        "#img2img_gallery",
+    ],
+};
+
+let forgeEnActiveDropTarget = null;
+
 let forgeEnContextMenuEl = null;
 let forgeEnContextMenuState = null;
 
@@ -635,6 +667,297 @@ function forgeEnOutputBrowserShowContextMenu(event, container, containerId) {
     }
 }
 
+function forgeEnOutputBrowserHasOutputPathDrag(dataTransfer) {
+    if (!dataTransfer || !dataTransfer.types) {
+        return false;
+    }
+    return Array.from(dataTransfer.types).indexOf(FORGE_EN_OUTPUT_PATH_MIME) >= 0;
+}
+
+function forgeEnOutputBrowserGetDragPath(dataTransfer) {
+    if (!dataTransfer) {
+        return "";
+    }
+    return (
+        dataTransfer.getData(FORGE_EN_OUTPUT_PATH_MIME) ||
+        dataTransfer.getData("text/plain") ||
+        ""
+    );
+}
+
+function forgeEnOutputBrowserIsOutputBrowserContainer(element) {
+    if (!element) {
+        return false;
+    }
+    return FORGE_EN_OUTPUT_BROWSER_CARD_IDS.some(function (containerId) {
+        return !!element.closest("#" + containerId);
+    });
+}
+
+function forgeEnOutputBrowserIsElementVisible(element) {
+    if (!element) {
+        return false;
+    }
+    if (typeof uiElementIsVisible === "function") {
+        return uiElementIsVisible(element);
+    }
+    return element.offsetParent !== null;
+}
+
+function forgeEnOutputBrowserGetImg2imgCanvasBlock(element) {
+    if (!element || forgeEnOutputBrowserGetVisibleMainTab() !== "img2img") {
+        return null;
+    }
+
+    for (let i = 0; i < FORGE_EN_OUTPUT_IMG2IMG_CANVAS_SELECTORS.length; i++) {
+        const block = element.closest(FORGE_EN_OUTPUT_IMG2IMG_CANVAS_SELECTORS[i]);
+        if (!block) {
+            continue;
+        }
+        if (!forgeEnOutputBrowserIsElementVisible(block)) {
+            continue;
+        }
+        if (!block.querySelector(".forge-container input[type='file']")) {
+            continue;
+        }
+        return block;
+    }
+    return null;
+}
+
+function forgeEnOutputBrowserGetPngInfoDropTarget(element) {
+    if (!element || forgeEnOutputBrowserIsOutputBrowserContainer(element)) {
+        return null;
+    }
+
+    const mainTab = forgeEnOutputBrowserGetVisibleMainTab();
+    const selectors = FORGE_EN_OUTPUT_DROP_TARGETS[mainTab] || [];
+    for (let i = 0; i < selectors.length; i++) {
+        const match = element.closest(selectors[i]);
+        if (match) {
+            return match;
+        }
+    }
+    return null;
+}
+
+function forgeEnOutputBrowserResolveDropAction(element) {
+    const canvasBlock = forgeEnOutputBrowserGetImg2imgCanvasBlock(element);
+    if (canvasBlock) {
+        return { kind: "loadImage", block: canvasBlock };
+    }
+
+    const target = forgeEnOutputBrowserGetPngInfoDropTarget(element);
+    if (target) {
+        return { kind: "applyPngInfo", target: target };
+    }
+    return null;
+}
+
+function forgeEnOutputBrowserGetDropHighlightElement(action) {
+    if (!action) {
+        return null;
+    }
+    if (action.kind === "loadImage") {
+        return action.block;
+    }
+    return action.target;
+}
+
+function forgeEnOutputBrowserGetDragPreviewUrl(dataTransfer) {
+    if (!dataTransfer) {
+        return "";
+    }
+    return dataTransfer.getData(FORGE_EN_OUTPUT_PREVIEW_URL_MIME) || "";
+}
+
+function forgeEnOutputBrowserLoadImageToCanvas(block, previewUrl, filepath) {
+    const fileInput = block.querySelector(
+        ".forge-container input[type='file']",
+    );
+    if (!fileInput) {
+        alert("無法找到 image input。");
+        return;
+    }
+    if (!previewUrl) {
+        alert("無法取得圖片預覽 URL。");
+        return;
+    }
+
+    fetch(previewUrl)
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error(response.statusText || String(response.status));
+            }
+            return response.blob();
+        })
+        .then(function (blob) {
+            const basename =
+                filepath.replace(/\\/g, "/").split("/").pop() || "image.png";
+            const file = new File([blob], basename, {
+                type: blob.type || "image/png",
+            });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+        })
+        .catch(function (err) {
+            alert("載入圖片失敗：" + err.message);
+        });
+}
+
+function forgeEnOutputBrowserSetActiveDropTarget(element) {
+    if (forgeEnActiveDropTarget === element) {
+        return;
+    }
+    if (forgeEnActiveDropTarget) {
+        forgeEnActiveDropTarget.classList.remove(
+            "forge-en-output-drop-target-active",
+        );
+    }
+    forgeEnActiveDropTarget = element;
+    if (element) {
+        element.classList.add("forge-en-output-drop-target-active");
+    }
+}
+
+function forgeEnOutputBrowserClearActiveDropTarget() {
+    forgeEnOutputBrowserSetActiveDropTarget(null);
+}
+
+function forgeEnOutputBrowserHandleDragOver(event) {
+    if (!forgeEnOutputBrowserHasOutputPathDrag(event.dataTransfer)) {
+        return;
+    }
+
+    const action = forgeEnOutputBrowserResolveDropAction(event.target);
+    const highlight = forgeEnOutputBrowserGetDropHighlightElement(action);
+    if (!highlight) {
+        forgeEnOutputBrowserClearActiveDropTarget();
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+    forgeEnOutputBrowserSetActiveDropTarget(highlight);
+}
+
+function forgeEnOutputBrowserHandleDrop(event) {
+    if (!forgeEnOutputBrowserHasOutputPathDrag(event.dataTransfer)) {
+        return;
+    }
+
+    const action = forgeEnOutputBrowserResolveDropAction(event.target);
+    if (!action) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    forgeEnOutputBrowserClearActiveDropTarget();
+
+    const filepath = forgeEnOutputBrowserGetDragPath(event.dataTransfer);
+    if (!filepath) {
+        return;
+    }
+
+    if (action.kind === "loadImage") {
+        const previewUrl = forgeEnOutputBrowserGetDragPreviewUrl(
+            event.dataTransfer,
+        );
+        forgeEnOutputBrowserLoadImageToCanvas(
+            action.block,
+            previewUrl,
+            filepath,
+        );
+        return;
+    }
+
+    forgeEnOutputBrowserSendToTab(
+        forgeEnOutputBrowserGetVisibleMainTab(),
+        filepath,
+    );
+}
+
+function forgeEnOutputBrowserHandleDragEnd() {
+    forgeEnOutputBrowserClearActiveDropTarget();
+    FORGE_EN_OUTPUT_BROWSER_CARD_IDS.forEach(function (containerId) {
+        const container = gradioApp().querySelector("#" + containerId);
+        if (!container) {
+            return;
+        }
+        container.querySelectorAll(".card.forge-en-output-dragging").forEach(
+            function (card) {
+                card.classList.remove("forge-en-output-dragging");
+            },
+        );
+    });
+}
+
+function forgeEnOutputBrowserEnsureDropHandlers() {
+    if (window._forgeEnOutputDropBound) {
+        return;
+    }
+    window._forgeEnOutputDropBound = true;
+
+    const root = gradioApp();
+    root.addEventListener("dragover", forgeEnOutputBrowserHandleDragOver, true);
+    root.addEventListener("drop", forgeEnOutputBrowserHandleDrop, true);
+    root.addEventListener("dragend", forgeEnOutputBrowserHandleDragEnd, true);
+}
+
+function forgeEnOutputBrowserHandleCardDragStart(event, container) {
+    if (event.target.closest(".button-row")) {
+        event.preventDefault();
+        return;
+    }
+
+    const card = event.target.closest(".card");
+    if (!card || !container.contains(card)) {
+        return;
+    }
+
+    const filepath = forgeEnOutputBrowserGetCardPath(card);
+    if (!filepath) {
+        event.preventDefault();
+        return;
+    }
+
+    event.dataTransfer.setData(FORGE_EN_OUTPUT_PATH_MIME, filepath);
+    event.dataTransfer.setData("text/plain", filepath);
+    const previewImg = card.querySelector("img.preview");
+    if (previewImg && previewImg.src) {
+        event.dataTransfer.setData(
+            FORGE_EN_OUTPUT_PREVIEW_URL_MIME,
+            previewImg.src,
+        );
+    }
+    event.dataTransfer.effectAllowed = "copy";
+    card.classList.add("forge-en-output-dragging");
+}
+
+function forgeEnOutputBrowserHandleCardDragEnd(event, container) {
+    const card = event.target.closest(".card");
+    if (card && container.contains(card)) {
+        card.classList.remove("forge-en-output-dragging");
+    }
+    forgeEnOutputBrowserClearActiveDropTarget();
+}
+
+function forgeEnOutputBrowserSetupCardDraggable() {
+    for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
+        const container = gradioApp().querySelector("#" + containerId);
+        if (!container) {
+            continue;
+        }
+        container.querySelectorAll(".card").forEach(function (card) {
+            card.draggable = true;
+        });
+    }
+}
+
 function forgeEnOutputBrowserBindCardInteractions() {
     forgeEnOutputBrowserApplySelectionStyle();
     forgeEnOutputBrowserEnsureKeyListener();
@@ -669,14 +992,36 @@ function forgeEnOutputBrowserBindCardInteractions() {
             },
             true,
         );
+
+        container.addEventListener(
+            "dragstart",
+            function (event) {
+                forgeEnOutputBrowserHandleCardDragStart(event, container);
+            },
+            true,
+        );
+
+        container.addEventListener(
+            "dragend",
+            function (event) {
+                forgeEnOutputBrowserHandleCardDragEnd(event, container);
+            },
+            true,
+        );
     }
 }
 
+function forgeEnOutputBrowserInit() {
+    forgeEnOutputBrowserBindCardInteractions();
+    forgeEnOutputBrowserSetupCardDraggable();
+    forgeEnOutputBrowserEnsureDropHandlers();
+}
+
 if (typeof onUiUpdate === "function") {
-    onUiUpdate(forgeEnOutputBrowserBindCardInteractions);
+    onUiUpdate(forgeEnOutputBrowserInit);
 }
 if (typeof onUiLoaded === "function") {
-    onUiLoaded(forgeEnOutputBrowserBindCardInteractions);
+    onUiLoaded(forgeEnOutputBrowserInit);
 } else {
-    forgeEnOutputBrowserBindCardInteractions();
+    forgeEnOutputBrowserInit();
 }

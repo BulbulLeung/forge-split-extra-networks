@@ -78,6 +78,8 @@
 
 - **單擊**卡片：高亮選取（類似檔案總管，邊線粗度可在設定調整）；**Ctrl+單擊**切換選取、**Shift+單擊**從錨點連續選取；**Ctrl+Shift+單擊**在保留既有選取下追加範圍。
 - **雙擊**卡片：以單圖預覽層顯示大圖；**Esc** 或點背景／關閉鈕可關閉預覽。
+- **拖放**卡片至左側 **Prompt**、**畫廊** 或 **Generation** 區：依**目前主分頁**套用 PNG info（txt2img 主分頁 → txt2img 欄位；img2img 主分頁 → img2img 欄位），效果與右鍵 **Send to txt2img/img2img** 相同。
+- **拖放**至 img2img 頁左側 **Init / Sketch / Inpaint** 畫布（ForgeCanvas）：**載入圖片**至目前可見的 image input，等同點選 Load image；**不會**套用 PNG info。拖到 Prompt／畫廊等仍為上述 PNG info 行為。
 - **右鍵**卡片：功能選單
   - **Send to txt2img** / **Send to img2img**：讀取**右鍵那張**圖的 PNG info，寫入對應分頁欄位並自動切換主分頁（僅單張）。
   - **Delete**：刪除**目前選取**的圖片（無選取時刪右鍵那張）；刪除前會跳出確認對話框。

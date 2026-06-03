@@ -169,7 +169,18 @@
 
 #txt2img_output_browser_cards .card,
 #img2img_output_browser_cards .card {
-    cursor: default;
+    cursor: grab;
+}
+
+#txt2img_output_browser_cards .card.forge-en-output-dragging,
+#img2img_output_browser_cards .card.forge-en-output-dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+}
+
+.forge-en-output-drop-target-active {
+    outline: 2px dashed var(--color-accent, #4a9eff);
+    outline-offset: 2px;
 }
 
 /* Output Browser: single-image preview (no gallery loop / tiled fullscreen) */
