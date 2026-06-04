@@ -51,6 +51,10 @@ shared.options_templates.update(
                 gr.Slider,
                 {"minimum": 1, "maximum": 12, "step": 1},
             ),
+            "forge_en_output_browser_auto_refresh": shared.OptionInfo(
+                True,
+                "Output Browser: auto-refresh after txt2img/img2img generation completes",
+            ),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
                 "output browser,lora,checkpoints,textual inversion",
                 "Extra Networks tab order (comma-separated page names)",

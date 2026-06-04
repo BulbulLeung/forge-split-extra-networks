@@ -1268,6 +1268,80 @@ function forgeEnOutputBrowserBindRefreshScrollPreserve() {
     }
 }
 
+function forgeEnOutputBrowserIsAutoRefreshEnabled() {
+    if (typeof opts === "undefined") {
+        return true;
+    }
+    if (opts.forge_en_output_browser_enabled === false) {
+        return false;
+    }
+    return opts.forge_en_output_browser_auto_refresh !== false;
+}
+
+function forgeEnOutputBrowserGalleryTabname(gallery) {
+    if (!gallery) {
+        return null;
+    }
+    const id = gallery.id || "";
+    if (id === "txt2img_gallery") {
+        return "txt2img";
+    }
+    if (id === "img2img_gallery") {
+        return "img2img";
+    }
+    return null;
+}
+
+function forgeEnOutputBrowserOnGenerationComplete(gallery) {
+    if (!forgeEnOutputBrowserIsAutoRefreshEnabled()) {
+        return;
+    }
+    const tabname = forgeEnOutputBrowserGalleryTabname(gallery);
+    if (!tabname) {
+        return;
+    }
+    setTimeout(function () {
+        forgeEnOutputBrowserRefreshPane(tabname);
+    }, 150);
+}
+
+function forgeEnOutputBrowserWrapRequestProgress() {
+    if (window._forgeEnRequestProgressWrapped) {
+        return;
+    }
+    if (typeof requestProgress !== "function") {
+        return;
+    }
+    window._forgeEnRequestProgressWrapped = true;
+    const origRequestProgress = requestProgress;
+    requestProgress = function (
+        id_task,
+        progressbarContainer,
+        gallery,
+        atEnd,
+        onProgress,
+        inactivityTimeout,
+    ) {
+        const tabname = forgeEnOutputBrowserGalleryTabname(gallery);
+        const wrappedAtEnd = function () {
+            if (typeof atEnd === "function") {
+                atEnd();
+            }
+            if (tabname) {
+                forgeEnOutputBrowserOnGenerationComplete(gallery);
+            }
+        };
+        return origRequestProgress(
+            id_task,
+            progressbarContainer,
+            gallery,
+            wrappedAtEnd,
+            onProgress,
+            inactivityTimeout,
+        );
+    };
+}
+
 function forgeEnOutputBrowserInit() {
     forgeEnOutputBrowserBindCardInteractions();
     forgeEnOutputBrowserSetupCardDraggable();
@@ -1275,11 +1349,16 @@ function forgeEnOutputBrowserInit() {
     forgeEnOutputBrowserBindRefreshScrollPreserve();
 }
 
+function forgeEnOutputBrowserRegister() {
+    forgeEnOutputBrowserWrapRequestProgress();
+    forgeEnOutputBrowserInit();
+}
+
 if (typeof onUiUpdate === "function") {
     onUiUpdate(forgeEnOutputBrowserInit);
 }
 if (typeof onUiLoaded === "function") {
-    onUiLoaded(forgeEnOutputBrowserInit);
+    onUiLoaded(forgeEnOutputBrowserRegister);
 } else {
-    forgeEnOutputBrowserInit();
+    forgeEnOutputBrowserRegister();
 }

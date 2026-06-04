@@ -59,6 +59,7 @@
 | Show Output Browser tab in Extra Networks | 是否顯示 Output Browser 分頁 | 啟用 |
 | Output Browser: maximum number of images to list | 列表最多顯示幾張圖（依修改時間取最新） | 500 |
 | Output Browser: selection outline width (px) | 單擊選取縮圖時的高亮邊線粗度 | 5 |
+| Output Browser: auto-refresh after txt2img/img2img generation completes | 生成完成後自動重新掃描 Output Browser 列表 | 啟用 |
 | Extra Networks tab order | 右欄分頁順序（逗號分隔） | output browser,lora,checkpoints,textual inversion |
 | Default Extra Networks tab on startup | 啟動時預設開啟的分頁 | output_browser |
 
@@ -84,8 +85,8 @@
   - **Send to txt2img** / **Send to img2img**：讀取**右鍵那張**圖的 PNG info，寫入對應分頁欄位並自動切換主分頁（僅單張）。
   - **Delete**：刪除**目前選取**的圖片（無選取時刪右鍵那張）；刪除前會跳出確認對話框。
 - **Delete 鍵**：在列表已選取圖片時，按 **Del** 與右鍵 Delete 相同（在輸入框內打字時不會觸發；大圖開啟時則刪除目前大圖）。
-- 點 **Refresh** 或刪除後重新載入列表時，**捲動位置會維持**在 refresh 前的位置，不會跳回最上方。
-- 新增或變更輸出圖後，在 Extra Networks 面板點 **Refresh** 更新列表。
+- 點 **Refresh**、刪除後重新載入列表，或**生成完成後自動刷新**時，**捲動位置會維持**在 refresh 前的位置，不會跳回最上方。
+- **txt2img / img2img** 每次生成完成後，預設會自動更新 Output Browser 列表；可在設定關閉「auto-refresh after generation completes」。手動點 **Refresh** 仍隨時可用。
 
 ## 目錄結構
 
