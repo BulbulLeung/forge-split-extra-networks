@@ -303,6 +303,40 @@ function forgeEnOutputBrowserContainerIdForTab(tabname) {
     return tabname + "_output_browser_cards";
 }
 
+function forgeEnOutputBrowserPaneHtmlElemId(tabname) {
+    return tabname + "_output_browser_cards_html";
+}
+
+function forgeEnOutputBrowserFindPaneHtmlRoot(tabname) {
+    const id = forgeEnOutputBrowserPaneHtmlElemId(tabname);
+    const app = gradioApp();
+    return (
+        (app && app.querySelector("#" + id)) ||
+        document.getElementById(id)
+    );
+}
+
+function forgeEnOutputBrowserApplyPaneHtml(tabname, html) {
+    const root = forgeEnOutputBrowserFindPaneHtmlRoot(tabname);
+    if (!root) {
+        return false;
+    }
+    root.innerHTML = html;
+    return true;
+}
+
+function forgeEnOutputBrowserAfterPaneUpdate(tabname) {
+    const tabnameFull = tabname + "_output_browser";
+    if (typeof applyExtraNetworkFilter === "function") {
+        applyExtraNetworkFilter(tabnameFull);
+    }
+    forgeEnOutputBrowserBindFilterSelectionSync();
+    forgeEnOutputBrowserBindCardInteractions();
+    if (typeof setupAllResizeHandles === "function") {
+        setupAllResizeHandles();
+    }
+}
+
 function forgeEnOutputBrowserGetCardsScrollElement(container) {
     return container || null;
 }
@@ -595,22 +629,64 @@ function forgeEnOutputBrowserHandleCardDoubleClick(event, container) {
     forgeEnOutputBrowserOpenPreviewAtIndex(container, index);
 }
 
-function forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh) {
+function forgeEnOutputBrowserRefreshPaneFallback(tabname, onAfterRefresh) {
     const containerId = forgeEnOutputBrowserContainerIdForTab(tabname);
-    forgeEnOutputBrowserSaveScroll(containerId);
-
     const btn = gradioApp().getElementById(
         tabname + "_output_browser_extra_refresh_internal",
     );
     if (btn) {
         btn.dispatchEvent(new Event("click"));
     }
-
     forgeEnOutputBrowserScheduleScrollRestore(containerId);
-
     if (typeof onAfterRefresh === "function") {
         forgeEnOutputBrowserScheduleAfterRefresh(containerId, onAfterRefresh);
     }
+}
+
+function forgeEnOutputBrowserRefreshPaneViaApi(tabname, onAfterRefresh) {
+    const containerId = forgeEnOutputBrowserContainerIdForTab(tabname);
+    forgeEnOutputBrowserSaveScroll(containerId);
+
+    const url =
+        forgeEnOutputBrowserApiUrl(
+            "/forge-en-output-browser/pane-html?tabname=" +
+                encodeURIComponent(tabname),
+        );
+
+    fetch(url)
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (data) {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            if (!data.html) {
+                throw new Error("empty pane html");
+            }
+            if (!forgeEnOutputBrowserApplyPaneHtml(tabname, data.html)) {
+                throw new Error("pane html target not found");
+            }
+            forgeEnOutputBrowserAfterPaneUpdate(tabname);
+            forgeEnOutputBrowserScheduleScrollRestore(containerId);
+            if (typeof onAfterRefresh === "function") {
+                forgeEnOutputBrowserScheduleAfterRefresh(
+                    containerId,
+                    onAfterRefresh,
+                );
+            }
+        })
+        .catch(function (err) {
+            console.warn(
+                "forge-en-output-browser: API refresh failed, falling back",
+                err,
+            );
+            forgeEnOutputBrowserRefreshPaneFallback(tabname, onAfterRefresh);
+        });
+}
+
+function forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh) {
+    forgeEnOutputBrowserRefreshPaneViaApi(tabname, onAfterRefresh);
 }
 
 function forgeEnOutputBrowserFindInput(root) {
@@ -1315,7 +1391,10 @@ function forgeEnOutputBrowserWrapExtraNetworksApplyFilter(container, tabname) {
 
     extraNetworksApplyFilter[key] = function (force) {
         orig(force);
-        forgeEnOutputBrowserSyncSelectionToFilter(container);
+        const liveContainer = gradioApp().querySelector(
+            "#" + forgeEnOutputBrowserContainerIdForTab(tabname),
+        );
+        forgeEnOutputBrowserSyncSelectionToFilter(liveContainer);
     };
     extraNetworksApplyFilter[key]._forgeEnWrapped = true;
 }

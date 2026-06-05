@@ -8,7 +8,7 @@ import gradio as gr
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from modules import images, infotext_utils, script_callbacks
+from modules import images, infotext_utils, script_callbacks, ui_extra_networks
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _EXT_DIR not in sys.path:
@@ -183,6 +183,13 @@ def _apply_response(
     }
 
 
+def _get_output_browser_page():
+    return next(
+        (p for p in ui_extra_networks.extra_pages if p.name == "output browser"),
+        None,
+    )
+
+
 def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
     @app.get("/forge-en-output-browser/infotext")
     async def get_infotext(filename: str = ""):
@@ -234,6 +241,22 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
             raise
         except Exception as e:
             return _apply_response(None, [], str(e))
+
+    @app.get("/forge-en-output-browser/pane-html")
+    async def get_pane_html(tabname: str = "txt2img"):
+        if tabname not in ("txt2img", "img2img"):
+            return {"html": "", "error": "invalid tabname"}
+
+        page = _get_output_browser_page()
+        if page is None:
+            return {"html": "", "error": "Output Browser not registered"}
+
+        try:
+            page.refresh()
+            html = page.create_html(tabname)
+            return {"html": html, "error": None}
+        except Exception as e:
+            return {"html": "", "error": str(e)}
 
     @app.post("/forge-en-output-browser/apply-infotext")
     async def apply_infotext_to_tab(req: ApplyInfotextRequest):
