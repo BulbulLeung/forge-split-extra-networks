@@ -682,45 +682,104 @@ function forgeEnOutputBrowserRecalculatePrompts(targetTab) {
     }
 }
 
+function forgeEnOutputBrowserApplySendResponse(targetTab, data) {
+    if (data.error) {
+        alert(data.error);
+        return false;
+    }
+    if (!data.updates || data.updates.length === 0) {
+        alert("此圖片沒有可套用的參數。");
+        return false;
+    }
+
+    let applied = 0;
+    for (const update of data.updates) {
+        if (forgeEnOutputBrowserApplyGradioUpdate(update)) {
+            applied++;
+        }
+    }
+
+    if (applied === 0) {
+        alert("無法寫入 UI 欄位，請確認 WebUI 已完全載入。");
+        return false;
+    }
+
+    forgeEnOutputBrowserSwitchToTab(targetTab);
+    forgeEnOutputBrowserRecalculatePrompts(targetTab);
+    return true;
+}
+
+function forgeEnOutputBrowserFetchApply(filepath, targetTab) {
+    return fetch(forgeEnOutputBrowserApiUrl("/forge-en-output-browser/apply"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: filepath, tabname: targetTab }),
+    }).then(forgeEnOutputBrowserParseJsonResponse);
+}
+
+function forgeEnOutputBrowserFetchApplyInfotextFallback(filepath, targetTab) {
+    const infoUrl =
+        forgeEnOutputBrowserApiUrl("/forge-en-output-browser/infotext") +
+        "?filename=" +
+        encodeURIComponent(filepath);
+    return fetch(infoUrl)
+        .then(forgeEnOutputBrowserParseJsonResponse)
+        .then(function (infoData) {
+            if (infoData.error) {
+                throw new Error(infoData.error);
+            }
+            if (!infoData.info) {
+                throw new Error("No PNG info in image");
+            }
+            return fetch(
+                forgeEnOutputBrowserApiUrl(
+                    "/forge-en-output-browser/apply-infotext",
+                ),
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        info: infoData.info,
+                        tabname: targetTab,
+                    }),
+                },
+            ).then(forgeEnOutputBrowserParseJsonResponse);
+        });
+}
+
+function forgeEnOutputBrowserIsFetchNetworkError(err) {
+    if (!err) {
+        return false;
+    }
+    if (err instanceof TypeError) {
+        return true;
+    }
+    const message = err.message || "";
+    return message.indexOf("Failed to fetch") >= 0;
+}
+
 function forgeEnOutputBrowserSendToTab(targetTab, filepath) {
     if (!filepath) {
         alert("無法取得圖片路徑。");
         return;
     }
 
-    fetch(forgeEnOutputBrowserApiUrl("/forge-en-output-browser/apply"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: filepath, tabname: targetTab }),
-    })
-        .then(forgeEnOutputBrowserParseJsonResponse)
+    forgeEnOutputBrowserFetchApply(filepath, targetTab)
         .then(function (data) {
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
-            if (!data.updates || data.updates.length === 0) {
-                alert("此圖片沒有可套用的參數。");
-                return;
-            }
-
-            let applied = 0;
-            for (const update of data.updates) {
-                if (forgeEnOutputBrowserApplyGradioUpdate(update)) {
-                    applied++;
-                }
-            }
-
-            if (applied === 0) {
-                alert("無法寫入 UI 欄位，請確認 WebUI 已完全載入。");
-                return;
-            }
-
-            forgeEnOutputBrowserSwitchToTab(targetTab);
-            forgeEnOutputBrowserRecalculatePrompts(targetTab);
+            forgeEnOutputBrowserApplySendResponse(targetTab, data);
         })
         .catch(function (err) {
-            alert("套用 PNG info 失敗：" + err.message);
+            if (!forgeEnOutputBrowserIsFetchNetworkError(err)) {
+                alert("套用 PNG info 失敗：" + err.message);
+                return;
+            }
+            forgeEnOutputBrowserFetchApplyInfotextFallback(filepath, targetTab)
+                .then(function (data) {
+                    forgeEnOutputBrowserApplySendResponse(targetTab, data);
+                })
+                .catch(function (fallbackErr) {
+                    alert("套用 PNG info 失敗：" + fallbackErr.message);
+                });
         });
 }
 

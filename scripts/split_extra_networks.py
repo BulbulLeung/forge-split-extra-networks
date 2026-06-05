@@ -2,7 +2,7 @@ import gradio as gr
 import os
 import sys
 
-from modules import script_callbacks, scripts, shared, ui_extra_networks
+from modules import errors, script_callbacks, scripts, shared, ui_extra_networks
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _EXT_DIR not in sys.path:
@@ -136,3 +136,12 @@ class SplitExtraNetworksLayout(scripts.Script):
 
     def show(self, is_img2img):
         return False
+
+
+try:
+    import output_browser_api  # noqa: F401 — registers on_app_started routes
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: output_browser_api load failed",
+        exc_info=True,
+    )

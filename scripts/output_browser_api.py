@@ -1,7 +1,8 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import gradio as gr
 from fastapi import FastAPI, HTTPException
@@ -54,6 +55,48 @@ class ApplyRequest(BaseModel):
     tabname: str
 
 
+class ApplyInfotextRequest(BaseModel):
+    info: str
+    tabname: str
+
+
+def _json_safe_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_json_safe_value(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _json_safe_value(v) for k, v in value.items()}
+    return str(value)
+
+
+def _json_safe_update(item: dict) -> dict:
+    safe = {"id": item["id"]}
+    for key, value in item.items():
+        if key == "id":
+            continue
+        safe[key] = _json_safe_value(value)
+    return safe
+
+
+def _gr_update_to_payload(result) -> Optional[dict]:
+    if result is None or isinstance(result, infotext_utils.type_of_gr_update):
+        return None
+    if isinstance(result, dict):
+        payload = {
+            k: v for k, v in result.items() if k != "__type__" and v is not None
+        }
+        return payload or None
+    payload = {}
+    for key in ("value", "visible", "choices", "maximum", "minimum", "interactive"):
+        val = getattr(result, key, None)
+        if val is not None:
+            payload[key] = val
+    return payload or None
+
+
 def _field_update_from_params(component, key, params: dict) -> Optional[dict]:
     """Build UI updates without reading component.value (unsafe outside Gradio requests)."""
     elem_id = getattr(component, "elem_id", None)
@@ -65,41 +108,43 @@ def _field_update_from_params(component, key, params: dict) -> Optional[dict]:
             result = key(params)
         except Exception:
             return None
-        if result is None or isinstance(result, infotext_utils.type_of_gr_update):
-            return None
-        if isinstance(result, dict):
-            payload = {k: v for k, v in result.items() if k != "__type__" and v is not None}
-            if payload:
-                return {"id": elem_id, **payload}
+        payload = _gr_update_to_payload(result)
+        if payload:
+            return _json_safe_update({"id": elem_id, **payload})
         return None
 
     value = params.get(key, None)
     if value is None:
         return None
-    return {"id": elem_id, "value": value}
+    return _json_safe_update({"id": elem_id, "value": value})
 
 
-def build_field_updates(tabname: str, filepath: str) -> tuple[Optional[str], list[dict], Optional[str]]:
+def _collect_field_updates(tabname: str, info: str) -> tuple[Optional[str], list[dict], Optional[str]]:
     if tabname not in ("txt2img", "img2img"):
         return None, [], "Invalid tab"
+
+    if not info:
+        return None, [], "No PNG info in image"
 
     page = infotext_utils.paste_fields.get(tabname)
     if not page:
         return None, [], "Tab not ready"
 
-    image = images.read(filepath)
-    info, _ = images.read_info_from_image(image)
-    if not info:
-        return None, [], "No PNG info in image"
-
     params = infotext_utils.parse_generation_parameters(info)
-    script_callbacks.infotext_pasted_callback(info, params)
+    try:
+        script_callbacks.infotext_pasted_callback(info, params)
+    except Exception:
+        pass
 
     updates = []
     for paste_field in page.get("fields", []):
         if isinstance(paste_field, infotext_utils.PasteField):
             component = paste_field.component
-            key = paste_field.label if paste_field.label is not None else paste_field.function
+            key = (
+                paste_field.label
+                if paste_field.label is not None
+                else paste_field.function
+            )
         else:
             component, key = paste_field[0], paste_field[1]
 
@@ -108,6 +153,34 @@ def build_field_updates(tabname: str, filepath: str) -> tuple[Optional[str], lis
             updates.append(item)
 
     return info, updates, None
+
+
+def build_field_updates_from_info(
+    tabname: str, info: str
+) -> tuple[Optional[str], list[dict], Optional[str]]:
+    return _collect_field_updates(tabname, info)
+
+
+def build_field_updates(
+    tabname: str, filepath: str
+) -> tuple[Optional[str], list[dict], Optional[str]]:
+    image = images.read(filepath)
+    info, _ = images.read_info_from_image(image)
+    if not info:
+        return None, [], "No PNG info in image"
+    return _collect_field_updates(tabname, info)
+
+
+def _apply_response(
+    info: Optional[str], updates: list[dict], error: Optional[str]
+) -> dict:
+    if error:
+        return {"info_present": False, "updates": [], "error": error}
+    return {
+        "info_present": bool(info),
+        "updates": updates,
+        "error": None,
+    }
 
 
 def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
@@ -148,16 +221,34 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
 
     @app.post("/forge-en-output-browser/apply")
     async def apply_to_tab(req: ApplyRequest):
-        if not req.filename:
-            raise HTTPException(status_code=400, detail="filename required")
+        try:
+            if not req.filename:
+                raise HTTPException(status_code=400, detail="filename required")
 
-        path = validate_output_file(req.filename)
-        info, updates, error = build_field_updates(req.tabname, str(path))
+            path = validate_output_file(req.filename)
+            info, updates, error = await asyncio.to_thread(
+                build_field_updates, req.tabname, str(path)
+            )
+            return _apply_response(info, updates, error)
+        except HTTPException:
+            raise
+        except Exception as e:
+            return _apply_response(None, [], str(e))
 
-        if error:
-            return {"info": info, "updates": [], "error": error}
+    @app.post("/forge-en-output-browser/apply-infotext")
+    async def apply_infotext_to_tab(req: ApplyInfotextRequest):
+        try:
+            if not req.info:
+                raise HTTPException(status_code=400, detail="info required")
 
-        return {"info": info, "updates": updates, "error": None}
+            info, updates, error = await asyncio.to_thread(
+                build_field_updates_from_info, req.tabname, req.info
+            )
+            return _apply_response(info, updates, error)
+        except HTTPException:
+            raise
+        except Exception as e:
+            return _apply_response(None, [], str(e))
 
 
 script_callbacks.on_app_started(
