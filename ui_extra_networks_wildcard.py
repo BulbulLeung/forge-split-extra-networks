@@ -53,6 +53,47 @@ class ExtraNetworksPageWildcard(ui_extra_networks.ExtraNetworksPage):
             return [wildcard_dir]
         return []
 
+    def create_dirs_view_html(self, tabname: str) -> str:
+        """Folder filter buttons use forward slashes to match card paths."""
+        parentdir = os.path.abspath(self._wildcard_dir())
+        if not os.path.isdir(parentdir):
+            return ""
+
+        subdirs: dict[str, int] = {}
+        for root, dirs, _ in sorted(
+            os.walk(parentdir, followlinks=True),
+            key=lambda x: shared.natural_sort_key(x[0]),
+        ):
+            for dirname in sorted(dirs, key=shared.natural_sort_key):
+                path = os.path.join(root, dirname)
+                if not os.path.isdir(path):
+                    continue
+                if len(os.listdir(path)) == 0:
+                    continue
+
+                rel = os.path.relpath(path, parentdir).replace("\\", "/")
+                if not rel.endswith("/"):
+                    rel = rel + "/"
+
+                if (
+                    "/." in rel or rel.startswith(".")
+                ) and not shared.opts.extra_networks_show_hidden_directories:
+                    continue
+
+                subdirs[rel] = 1
+
+        if subdirs:
+            subdirs = {"": 1, **subdirs}
+
+        return "".join(
+            [
+                f"""<button class='lg secondary gradio-button custom-button{" search-all" if subdir == "" else ""}' """
+                f"""onclick='extraNetworksSearchButton("{tabname}", "{self.extra_networks_tabname}", event)'>"""
+                f"""{html.escape(subdir if subdir != "" else "all")}</button>"""
+                for subdir in subdirs
+            ]
+        )
+
     def list_items(self):
         wildcard_dir = self._wildcard_dir()
         if not os.path.isdir(wildcard_dir):
