@@ -5,11 +5,13 @@ import sys
 from modules import errors, script_callbacks, scripts, shared, ui_extra_networks
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _EXT_DIR not in sys.path:
-    sys.path.insert(0, _EXT_DIR)
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+for _path in (_EXT_DIR, _SCRIPTS_DIR):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 _EXT_JS_DIR = os.path.join(_EXT_DIR, "javascript")
-_EXT_JS_FILES = ("split_extra_networks.js", "output_browser.js")
+_EXT_JS_FILES = ("split_extra_networks.js", "output_browser.js", "wildcard.js")
 
 shared.options_templates.update(
     shared.options_section(
@@ -55,8 +57,12 @@ shared.options_templates.update(
                 True,
                 "Output Browser: auto-refresh after txt2img/img2img generation completes",
             ),
+            "forge_en_wildcard_enabled": shared.OptionInfo(
+                True,
+                "Show Wildcard tab in Extra Networks",
+            ).needs_reload_ui(),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
-                "output browser,lora,checkpoints,textual inversion",
+                "output browser,wildcard,lora,checkpoints,textual inversion",
                 "Extra Networks tab order (comma-separated page names)",
             ).needs_reload_ui(),
             "forge_en_split_default_extra_tab": shared.OptionInfo(
@@ -66,6 +72,7 @@ shared.options_templates.update(
                 lambda: {
                     "choices": [
                         "output_browser",
+                        "wildcard",
                         "lora",
                         "checkpoints",
                         "textual_inversion",
@@ -116,10 +123,19 @@ def _register_output_browser():
     ui_extra_networks.register_page(ExtraNetworksPageOutputBrowser())
 
 
+def _register_wildcard():
+    if not shared.opts.forge_en_wildcard_enabled:
+        return
+    from ui_extra_networks_wildcard import ExtraNetworksPageWildcard
+
+    ui_extra_networks.register_page(ExtraNetworksPageWildcard())
+
+
 def _on_before_ui():
     _ensure_js_in_javascript_html()
     _apply_extra_networks_tab_order()
     _register_output_browser()
+    _register_wildcard()
 
 
 script_callbacks.on_before_ui(
@@ -129,7 +145,7 @@ script_callbacks.on_before_ui(
 
 
 class SplitExtraNetworksLayout(scripts.Script):
-    """Registers settings and Output Browser EN page; layout via javascript."""
+    """Registers settings, Output Browser and Wildcard EN pages; layout via javascript."""
 
     def title(self):
         return "Split Extra Networks layout"

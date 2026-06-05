@@ -158,6 +158,47 @@
     display: none !important;
 }
 
+/* Output Browser / Wildcard: align cards from top (fixes last-in-row preview sitting lower) */
+#txt2img_output_browser_cards,
+#img2img_output_browser_cards,
+#txt2img_wildcard_cards,
+#img2img_wildcard_cards {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    align-items: flex-start;
+}
+
+#txt2img_output_browser_cards .card,
+#img2img_output_browser_cards .card,
+#txt2img_wildcard_cards .card,
+#img2img_wildcard_cards .card {
+    vertical-align: top;
+    flex-shrink: 0;
+}
+
+#txt2img_output_browser_cards .card .preview,
+#img2img_output_browser_cards .card .preview,
+#txt2img_wildcard_cards .card .preview,
+#img2img_wildcard_cards .card .preview {
+    top: 0;
+    left: 0;
+}
+
+/* Wildcard: prompt-active highlight (same outline setting as Output Browser) */
+#txt2img_wildcard_cards .card.forge-en-wildcard-active,
+#img2img_wildcard_cards .card.forge-en-wildcard-active {
+    outline: var(--forge-en-output-selection-outline-width, 5px) solid
+        var(--color-accent, #4a9eff);
+    outline-offset: -2px;
+    box-shadow: 0 0 12px rgba(74, 158, 255, 0.45);
+}
+
+#txt2img_wildcard_cards .card,
+#img2img_wildcard_cards .card {
+    cursor: pointer;
+}
+
 /* Output Browser: single-click selection highlight */
 #txt2img_output_browser_cards .card.forge-en-output-selected,
 #img2img_output_browser_cards .card.forge-en-output-selected {
