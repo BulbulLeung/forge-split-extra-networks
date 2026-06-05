@@ -281,6 +281,24 @@ function forgeEnOutputBrowserGetCards(container) {
     return Array.from(container.querySelectorAll(".card"));
 }
 
+function forgeEnOutputBrowserIsCardVisible(card) {
+    return card && !card.classList.contains("hidden");
+}
+
+function forgeEnOutputBrowserGetVisibleCards(container) {
+    return forgeEnOutputBrowserGetCards(container).filter(
+        forgeEnOutputBrowserIsCardVisible,
+    );
+}
+
+function forgeEnOutputBrowserGetVisibleSelectedCards(container) {
+    return forgeEnOutputBrowserGetVisibleCards(container).filter(function (
+        card,
+    ) {
+        return card.classList.contains(FORGE_EN_OUTPUT_SELECTED_CLASS);
+    });
+}
+
 function forgeEnOutputBrowserContainerIdForTab(tabname) {
     return tabname + "_output_browser_cards";
 }
@@ -381,7 +399,7 @@ function forgeEnOutputBrowserScheduleAfterRefresh(containerId, callback) {
 
 function forgeEnOutputBrowserBuildLightboxEntries(container) {
     const entries = [];
-    forgeEnOutputBrowserGetCards(container).forEach(function (card) {
+    forgeEnOutputBrowserGetVisibleCards(container).forEach(function (card) {
         const preview = card.querySelector("img.preview");
         if (!preview || !preview.src) {
             return;
@@ -479,7 +497,9 @@ function forgeEnOutputBrowserSelectRange(container, cards, fromIndex, toIndex) {
     const start = Math.min(fromIndex, toIndex);
     const end = Math.max(fromIndex, toIndex);
     for (let i = start; i <= end; i++) {
-        cards[i].classList.add(FORGE_EN_OUTPUT_SELECTED_CLASS);
+        if (forgeEnOutputBrowserIsCardVisible(cards[i])) {
+            cards[i].classList.add(FORGE_EN_OUTPUT_SELECTED_CLASS);
+        }
     }
 }
 
@@ -512,7 +532,11 @@ function forgeEnOutputBrowserHandleCardClick(event, container) {
     event.preventDefault();
     event.stopPropagation();
 
-    const cards = forgeEnOutputBrowserGetCards(container);
+    if (!forgeEnOutputBrowserIsCardVisible(card)) {
+        return;
+    }
+
+    const cards = forgeEnOutputBrowserGetVisibleCards(container);
     const index = cards.indexOf(card);
     if (index < 0) {
         return;
@@ -526,6 +550,7 @@ function forgeEnOutputBrowserHandleCardClick(event, container) {
             forgeEnOutputBrowserClearSelection(container);
         }
         forgeEnOutputBrowserSelectRange(container, cards, anchor, index);
+        forgeEnOutputBrowserSyncSelectionToFilter(container);
         return;
     }
 
@@ -558,7 +583,11 @@ function forgeEnOutputBrowserHandleCardDoubleClick(event, container) {
     event.preventDefault();
     event.stopPropagation();
 
-    const cards = forgeEnOutputBrowserGetCards(container);
+    if (!forgeEnOutputBrowserIsCardVisible(card)) {
+        return;
+    }
+
+    const cards = forgeEnOutputBrowserGetVisibleCards(container);
     const index = cards.indexOf(card);
     if (index < 0) {
         return;
@@ -754,11 +783,12 @@ function forgeEnOutputBrowserDeletePaths(paths, tabname) {
 }
 
 function forgeEnOutputBrowserGetDeletePaths(container, contextCard) {
-    const selected = container.querySelectorAll(
-        ".card." + FORGE_EN_OUTPUT_SELECTED_CLASS,
-    );
-    const cards =
-        selected.length > 0 ? Array.from(selected) : contextCard ? [contextCard] : [];
+    let cards = forgeEnOutputBrowserGetVisibleSelectedCards(container);
+    if (cards.length === 0 && contextCard) {
+        cards = forgeEnOutputBrowserIsCardVisible(contextCard)
+            ? [contextCard]
+            : [];
+    }
 
     const paths = [];
     const seen = new Set();
@@ -1194,6 +1224,68 @@ function forgeEnOutputBrowserSetupCardDraggable() {
     }
 }
 
+function forgeEnOutputBrowserSyncSelectionToFilter(container) {
+    if (!container) {
+        return;
+    }
+
+    const visibleSet = new Set(forgeEnOutputBrowserGetVisibleCards(container));
+    container
+        .querySelectorAll(".card." + FORGE_EN_OUTPUT_SELECTED_CLASS)
+        .forEach(function (card) {
+            if (!visibleSet.has(card)) {
+                card.classList.remove(FORGE_EN_OUTPUT_SELECTED_CLASS);
+            }
+        });
+    delete container.dataset.forgeEnAnchorIndex;
+}
+
+function forgeEnOutputBrowserWrapExtraNetworksApplyFilter(container, tabname) {
+    if (
+        typeof extraNetworksApplyFilter === "undefined" ||
+        !extraNetworksApplyFilter
+    ) {
+        return;
+    }
+
+    const key = tabname + "_output_browser";
+    const orig = extraNetworksApplyFilter[key];
+    if (!orig || orig._forgeEnWrapped) {
+        return;
+    }
+
+    extraNetworksApplyFilter[key] = function (force) {
+        orig(force);
+        forgeEnOutputBrowserSyncSelectionToFilter(container);
+    };
+    extraNetworksApplyFilter[key]._forgeEnWrapped = true;
+}
+
+function forgeEnOutputBrowserBindFilterSelectionSync() {
+    for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
+        const tabname = FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER[containerId];
+        const search = gradioApp().querySelector(
+            "#" + tabname + "_output_browser_extra_search",
+        );
+        const container = gradioApp().querySelector("#" + containerId);
+        if (!container) {
+            continue;
+        }
+
+        forgeEnOutputBrowserWrapExtraNetworksApplyFilter(container, tabname);
+
+        if (!search || search.dataset.forgeEnFilterSync === "1") {
+            continue;
+        }
+        search.dataset.forgeEnFilterSync = "1";
+        search.addEventListener("input", function () {
+            requestAnimationFrame(function () {
+                forgeEnOutputBrowserSyncSelectionToFilter(container);
+            });
+        });
+    }
+}
+
 function forgeEnOutputBrowserBindCardInteractions() {
     forgeEnOutputBrowserApplySelectionStyle();
     forgeEnOutputBrowserEnsureKeyListener();
@@ -1344,6 +1436,7 @@ function forgeEnOutputBrowserWrapRequestProgress() {
 
 function forgeEnOutputBrowserInit() {
     forgeEnOutputBrowserBindCardInteractions();
+    forgeEnOutputBrowserBindFilterSelectionSync();
     forgeEnOutputBrowserSetupCardDraggable();
     forgeEnOutputBrowserEnsureDropHandlers();
     forgeEnOutputBrowserBindRefreshScrollPreserve();
