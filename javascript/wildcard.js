@@ -11,7 +11,11 @@ const FORGE_EN_WILDCARD_PROMPT_SEPARATOR = ", ";
 const forgeEnWildcardBound = {
     prompt: Object.create(null),
     cards: Object.create(null),
+    contextMenu: Object.create(null),
 };
+
+let forgeEnWildcardContextMenuEl = null;
+let forgeEnWildcardContextMenuState = null;
 
 function forgeEnWildcardWrap() {
     if (
@@ -213,6 +217,270 @@ function forgeEnWildcardBindCardContainers() {
     });
 }
 
+function forgeEnWildcardGetCardFilepath(card) {
+    const btn = card.querySelector(".copy-path-button");
+    if (!btn) return null;
+    return (
+        btn.getAttribute("data-clipboard-text") ||
+        btn.dataset.clipboardText ||
+        null
+    );
+}
+
+function forgeEnWildcardCloseContextMenu() {
+    if (forgeEnWildcardContextMenuEl) {
+        forgeEnWildcardContextMenuEl.style.display = "none";
+    }
+    forgeEnWildcardContextMenuState = null;
+}
+
+function forgeEnWildcardAddLineToPrompt(tabname, line) {
+    const text = (line || "").trim();
+    if (!text) return;
+
+    const textarea = forgeEnWildcardGetPromptTextarea(tabname);
+    if (!textarea) return;
+
+    let lineWithSep = text;
+    if (!forgeEnWildcardEndsWithComma(lineWithSep)) {
+        lineWithSep += FORGE_EN_WILDCARD_PROMPT_SEPARATOR;
+    }
+
+    const current = (textarea.value || "").trimEnd();
+    textarea.value = current ? current + "\n" + lineWithSep : lineWithSep;
+
+    if (typeof updateInput === "function") {
+        updateInput(textarea);
+    }
+    if (tabname === "txt2img" && typeof recalculate_prompts_txt2img === "function") {
+        recalculate_prompts_txt2img();
+    } else if (
+        tabname === "img2img" &&
+        typeof recalculate_prompts_img2img === "function"
+    ) {
+        recalculate_prompts_img2img();
+    }
+}
+
+function forgeEnWildcardRenderContextMenuBody(menu, titleText, lines, error) {
+    menu.innerHTML = "";
+
+    const title = document.createElement("div");
+    title.className = "forge-en-wildcard-context-menu-title";
+    title.textContent = titleText;
+    menu.appendChild(title);
+
+    if (error) {
+        const msg = document.createElement("div");
+        msg.className = "forge-en-wildcard-context-menu-message";
+        msg.textContent = error;
+        menu.appendChild(msg);
+        return;
+    }
+
+    if (!lines || lines.length === 0) {
+        const msg = document.createElement("div");
+        msg.className = "forge-en-wildcard-context-menu-message";
+        msg.textContent = "No lines available";
+        menu.appendChild(msg);
+        return;
+    }
+
+    lines.forEach(function (line) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.line = line;
+        btn.textContent = line;
+        btn.title = line;
+        menu.appendChild(btn);
+    });
+}
+
+function forgeEnWildcardPositionContextMenu(menu, clientX, clientY) {
+    menu.style.display = "block";
+    menu.style.left = clientX + "px";
+    menu.style.top = clientY + "px";
+
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = Math.max(0, clientX - rect.width) + "px";
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = Math.max(0, clientY - rect.height) + "px";
+    }
+}
+
+function forgeEnWildcardFetchLines(filepath) {
+    const url =
+        "/forge-en-wildcard/lines?filename=" +
+        encodeURIComponent(filepath);
+    return fetch(url).then(function (response) {
+        return response.json();
+    });
+}
+
+function forgeEnWildcardEnsureContextMenu() {
+    if (forgeEnWildcardContextMenuEl) {
+        return forgeEnWildcardContextMenuEl;
+    }
+
+    const menu = document.createElement("div");
+    menu.id = "forgeEnWildcardContextMenu";
+    menu.className =
+        "forge-en-output-context-menu forge-en-wildcard-context-menu";
+    menu.style.display = "none";
+
+    function handleMenuAction(event) {
+        const btn = event.target.closest("button[data-line]");
+        if (!btn || !forgeEnWildcardContextMenuState) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const tabname = forgeEnWildcardContextMenuState.tabname;
+        const line = btn.dataset.line || "";
+        forgeEnWildcardCloseContextMenu();
+        forgeEnWildcardAddLineToPrompt(tabname, line);
+    }
+
+    menu.addEventListener("mousedown", handleMenuAction, true);
+    menu.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    if (!window._forgeEnWildcardContextMenuGlobalClose) {
+        window._forgeEnWildcardContextMenuGlobalClose = true;
+        document.addEventListener(
+            "click",
+            function (event) {
+                if (
+                    forgeEnWildcardContextMenuEl &&
+                    forgeEnWildcardContextMenuEl.contains(event.target)
+                ) {
+                    return;
+                }
+                forgeEnWildcardCloseContextMenu();
+            },
+            true,
+        );
+        document.addEventListener(
+            "contextmenu",
+            function (event) {
+                if (
+                    forgeEnWildcardContextMenuEl &&
+                    forgeEnWildcardContextMenuEl.style.display !== "none" &&
+                    !forgeEnWildcardContextMenuEl.contains(event.target)
+                ) {
+                    forgeEnWildcardCloseContextMenu();
+                }
+            },
+            true,
+        );
+    }
+
+    gradioApp().appendChild(menu);
+    forgeEnWildcardContextMenuEl = menu;
+    return menu;
+}
+
+function forgeEnWildcardShowContextMenu(event, container, tabname) {
+    if (event.target.closest(".button-row")) return;
+
+    const card = event.target.closest(".card");
+    if (!card || !container.contains(card)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const filepath = forgeEnWildcardGetCardFilepath(card);
+    const menu = forgeEnWildcardEnsureContextMenu();
+    const wildcardName = card.getAttribute("data-name") || "Wildcard";
+
+    forgeEnWildcardContextMenuState = { tabname: tabname };
+    forgeEnWildcardRenderContextMenuBody(menu, wildcardName, null, "Loading...");
+    forgeEnWildcardPositionContextMenu(menu, event.clientX, event.clientY);
+
+    if (!filepath) {
+        forgeEnWildcardRenderContextMenuBody(
+            menu,
+            wildcardName,
+            null,
+            "File path not found",
+        );
+        forgeEnWildcardPositionContextMenu(menu, event.clientX, event.clientY);
+        return;
+    }
+
+    forgeEnWildcardFetchLines(filepath)
+        .then(function (data) {
+            if (
+                !forgeEnWildcardContextMenuState ||
+                forgeEnWildcardContextMenuState.tabname !== tabname
+            ) {
+                return;
+            }
+            const title = data.name || wildcardName;
+            if (data.error) {
+                forgeEnWildcardRenderContextMenuBody(
+                    menu,
+                    title,
+                    null,
+                    data.error,
+                );
+            } else {
+                forgeEnWildcardRenderContextMenuBody(
+                    menu,
+                    title,
+                    data.lines || [],
+                    null,
+                );
+            }
+            forgeEnWildcardPositionContextMenu(
+                menu,
+                event.clientX,
+                event.clientY,
+            );
+        })
+        .catch(function (err) {
+            if (
+                !forgeEnWildcardContextMenuState ||
+                forgeEnWildcardContextMenuState.tabname !== tabname
+            ) {
+                return;
+            }
+            forgeEnWildcardRenderContextMenuBody(
+                menu,
+                wildcardName,
+                null,
+                err.message || "Failed to load lines",
+            );
+            forgeEnWildcardPositionContextMenu(
+                menu,
+                event.clientX,
+                event.clientY,
+            );
+        });
+}
+
+function forgeEnWildcardBindContextMenu() {
+    const app = gradioApp();
+    if (!app) return;
+
+    FORGE_EN_WILDCARD_TABNAMES.forEach(function (tabname) {
+        const container = app.querySelector("#" + tabname + "_wildcard_cards");
+        if (!container || forgeEnWildcardBound.contextMenu[tabname] === container) {
+            return;
+        }
+
+        forgeEnWildcardBound.contextMenu[tabname] = container;
+        container.addEventListener("contextmenu", function (event) {
+            forgeEnWildcardShowContextMenu(event, container, tabname);
+        });
+    });
+}
+
 function forgeEnWildcardCardClicked(card, event) {
     if (event) {
         event.preventDefault();
@@ -235,6 +503,7 @@ function forgeEnWildcardInit() {
     }
     forgeEnWildcardBindPromptListeners();
     forgeEnWildcardBindCardContainers();
+    forgeEnWildcardBindContextMenu();
     forgeEnWildcardSyncAllHighlights();
 }
 

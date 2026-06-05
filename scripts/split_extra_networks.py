@@ -161,3 +161,11 @@ except Exception:
         "forge-split-extra-networks: output_browser_api load failed",
         exc_info=True,
     )
+
+try:
+    import wildcard_api  # noqa: F401 — registers on_app_started routes
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: wildcard_api load failed",
+        exc_info=True,
+    )
