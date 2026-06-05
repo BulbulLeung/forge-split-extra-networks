@@ -44,18 +44,23 @@ class ExtraNetworksPageOutputBrowser(ui_extra_networks.ExtraNetworksPage):
         return super().create_html(tabname, empty=empty)
 
     def _folder_buttons_html(self, tabname: str) -> str:
-        buttons = []
+        subdirs = {}
         for mode_tab in _OUTPUT_TABS:
             outdir = self._resolve_outdir(mode_tab)
             if not outdir or not os.path.isdir(outdir):
                 continue
-            label = self._folder_label(mode_tab)
-            buttons.append(
-                f"""<button class='lg secondary gradio-button custom-button' """
-                f"""onclick='extraNetworksSearchButton("{tabname}", "{self.extra_networks_tabname}", event)'>"""
-                f"""{html.escape(label)}</button>"""
-            )
-        return "".join(buttons)
+            subdirs[self._folder_label(mode_tab)] = 1
+
+        if not subdirs:
+            return ""
+
+        subdirs = {"": 1, **subdirs}
+
+        return "".join([f"""
+        <button class='lg secondary gradio-button custom-button{" search-all" if subdir == "" else ""}' onclick='extraNetworksSearchButton("{tabname}", "{self.extra_networks_tabname}", event)'>
+        {html.escape(subdir if subdir != "" else "all")}
+        </button>
+        """ for subdir in subdirs])
 
     def create_dirs_view_html(self, tabname: str) -> str:
         return self._folder_buttons_html(tabname)

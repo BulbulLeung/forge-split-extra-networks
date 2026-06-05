@@ -85,14 +85,11 @@ class ExtraNetworksPageWildcard(ui_extra_networks.ExtraNetworksPage):
         if subdirs:
             subdirs = {"": 1, **subdirs}
 
-        return "".join(
-            [
-                f"""<button class='lg secondary gradio-button custom-button{" search-all" if subdir == "" else ""}' """
-                f"""onclick='extraNetworksSearchButton("{tabname}", "{self.extra_networks_tabname}", event)'>"""
-                f"""{html.escape(subdir if subdir != "" else "all")}</button>"""
-                for subdir in subdirs
-            ]
-        )
+        return "".join([f"""
+        <button class='lg secondary gradio-button custom-button{" search-all" if subdir == "" else ""}' onclick='extraNetworksSearchButton("{tabname}", "{self.extra_networks_tabname}", event)'>
+        {html.escape(subdir if subdir != "" else "all")}
+        </button>
+        """ for subdir in subdirs])
 
     def list_items(self):
         wildcard_dir = self._wildcard_dir()
