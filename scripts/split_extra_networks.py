@@ -13,6 +13,29 @@ for _path in (_EXT_DIR, _SCRIPTS_DIR):
 _EXT_JS_DIR = os.path.join(_EXT_DIR, "javascript")
 _EXT_JS_FILES = ("split_extra_networks.js", "output_browser.js", "wildcard.js")
 
+_FORGE_EN_TAB_CHOICES = [
+    "output_browser",
+    "wildcard",
+    "lora",
+    "checkpoints",
+    "textual_inversion",
+]
+
+
+def _parse_en_tab_slugs(text: str) -> list[str]:
+    if not text or not str(text).strip():
+        return []
+    return [
+        part.strip().lower().replace(" ", "_")
+        for part in str(text).split(",")
+        if part.strip()
+    ]
+
+
+def _forge_en_tab_dropdown():
+    return {"choices": list(_FORGE_EN_TAB_CHOICES)}
+
+
 shared.options_templates.update(
     shared.options_section(
         ("forge_en_split", "Split Extra Networks layout", "ui"),
@@ -67,17 +90,51 @@ shared.options_templates.update(
             ).needs_reload_ui(),
             "forge_en_split_default_extra_tab": shared.OptionInfo(
                 "output_browser",
-                "Default Extra Networks tab on startup",
+                "Default Extra Networks tab on startup (single column only)",
                 gr.Dropdown,
-                lambda: {
-                    "choices": [
-                        "output_browser",
-                        "wildcard",
-                        "lora",
-                        "checkpoints",
-                        "textual_inversion",
-                    ]
-                },
+                _forge_en_tab_dropdown,
+            ).needs_reload_ui(),
+            "forge_en_column_count": shared.OptionInfo(
+                1,
+                "Extra Networks horizontal columns (1–3)",
+                gr.Slider,
+                {"minimum": 1, "maximum": 3, "step": 1},
+            ).needs_reload_ui(),
+            "forge_en_column_default_width": shared.OptionInfo(
+                520,
+                "Default width per column (px, multi-column mode)",
+                gr.Slider,
+                {"minimum": 280, "maximum": 2000, "step": 10},
+            ),
+            "forge_en_column_1_tabs": shared.OptionInfo(
+                "output browser,wildcard,lora,checkpoints,textual inversion",
+                "Column 1: Extra Network tabs (comma-separated slugs)",
+            ).needs_reload_ui(),
+            "forge_en_column_2_tabs": shared.OptionInfo(
+                "",
+                "Column 2: Extra Network tabs (comma-separated slugs)",
+            ).needs_reload_ui(),
+            "forge_en_column_3_tabs": shared.OptionInfo(
+                "",
+                "Column 3: Extra Network tabs (comma-separated slugs)",
+            ).needs_reload_ui(),
+            "forge_en_column_1_default_tab": shared.OptionInfo(
+                "output_browser",
+                "Column 1: default tab on startup",
+                gr.Dropdown,
+                _forge_en_tab_dropdown,
+            ).needs_reload_ui(),
+            "forge_en_column_2_default_tab": shared.OptionInfo(
+                "lora",
+                "Column 2: default tab on startup",
+                gr.Dropdown,
+                _forge_en_tab_dropdown,
+            ).needs_reload_ui(),
+            "forge_en_column_3_default_tab": shared.OptionInfo(
+                "checkpoints",
+                "Column 3: default tab on startup",
+                gr.Dropdown,
+                _forge_en_tab_dropdown,
             ).needs_reload_ui(),
         },
     )

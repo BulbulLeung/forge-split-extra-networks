@@ -1,119 +1,169 @@
 # Forge Split Extra Networks
 
-將 **txt2img / img2img** 的 **Generation** 固定在左側，**Checkpoints、LoRA、Textual Inversion** 等 Extra Networks 獨立在右側，減少分頁切換、提升選模效率。內建 **Output Browser**，可在同一畫面瀏覽歷史輸出、套用 PNG info、刪除檔案，無需離開 txt2img / img2img。
+Designed for Stable Diffusion WebUI Forge - Neo.
 
-專為 Stable Diffusion WebUI Forge - Neo 設計。
+Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkpoints, LoRA, Textual Inversion, Wildcard, Output Browser**, and other Extra Networks on the right—reducing tab switching and making model selection faster. Includes built-in **Output Browser** and **Wildcard** tabs, with optional **1–3 column** horizontal layout; each column has its own tab bar, search bar, and width.
 
-![Split layout with Output Browser](preview.png)
 
-*預覽：左側為 Generation；右側 Extra Networks 的 **Output Browser** 分頁（搜尋列、txt2img / img2img 篩選、縮圖網格與右鍵選單）。*
+
+![Three-column Extra Networks: Output Browser, Wildcard, LoRA](preview.png)
+
+*Preview: Generation on the left; on the right, **three columns side by side**—**Output Browser** (history outputs), **Wildcard** (wildcard cards and categories), and **LoRA** (with Checkpoints / Textual Inversion tabs). Drag between columns to adjust width.*
 
 ---
 
-## 功能特色
+## Features
 
-| 項目 | 說明 |
-|------|------|
-| 左欄常駐 Generation | 採樣、尺寸、Seed、腳本與畫廊始終可見 |
-| 右欄 Extra Networks | Checkpoints、LoRA、Textual Inversion、Output Browser 等分頁集中在右側 |
-| Output Browser | 瀏覽輸出目錄內圖片；縮圖網格與路徑標籤；**單擊**多選、**雙擊**大圖預覽、**右鍵**送參／刪除 |
-| 記住寬度 | 可選將寬度存入瀏覽器 `localStorage` |
-| 非侵入式 | 僅安裝於 `extensions/`，不覆寫 `modules/`、`style.css` 等核心檔 |
+| Item | Description |
+|------|-------------|
+| Generation always on the left | Sampling, dimensions, seed, scripts, and gallery stay visible |
+| Extra Networks on the right | Checkpoints, LoRA, Textual Inversion, Wildcard, Output Browser, and other tabs grouped on the right |
+| Multi-column layout (1–3 columns) | Up to **3 horizontal columns** on the right; each column can show selected EN tabs, with independent Search/Sort and resizable width |
+| Output Browser | Browse images in the output directory; thumbnail grid with path labels; **single-click** multi-select, **double-click** full-size preview, **right-click** send params / delete |
+| Wildcard | Browse wildcard files; **single-click** toggles `__name__` tokens in the prompt; **right-click** opens a line picker to append a single line from a file to the prompt |
+| Remember width | Optionally save right-panel / per-column width to browser `localStorage` |
+| Non-invasive | Installed under `extensions/` only; does not overwrite core files such as `modules/` or `style.css` |
 
-## 安裝
+## Installation
 
-### 方式一：手動安裝
+### Method 1: Manual install
 
-1. 將本儲存庫複製或下載到 WebUI 的 `extensions` 目錄：
+1. Copy or download this repository into your WebUI `extensions` directory:
 
    ```
-   <你的 WebUI 根目錄>/extensions/forge-split-extra-networks/
+   <your WebUI root>/extensions/forge-split-extra-networks/
    ```
 
-2. 重新啟動 WebUI，或至 **Settings → Actions → Reload UI**。
+2. Restart the WebUI, or go to **Settings → Actions → Reload UI**.
 
-3. 在 **Settings → Extensions** 確認 `forge-split-extra-networks` 已啟用。
+3. Under **Settings → Extensions**, confirm `forge-split-extra-networks` is enabled.
 
-### 方式二：從 URL 安裝
+### Method 2: Install from URL
 
-1. 開啟 **Extensions** 分頁。
-2. 選 **Install from URL**。
-3. 貼上本儲存庫 URL：
+1. Open the **Extensions** tab.
+2. Choose **Install from URL**.
+3. Paste this repository URL:
 
    ```
    https://github.com/BulbulLeung/forge-split-extra-networks.git
    ```
 
-4. 安裝後重新啟動 WebUI。
+4. Restart the WebUI after installation.
 
-## 設定
+## Settings
 
 **Settings → Split Extra Networks layout**
 
-| 選項 | 說明 | 預設 |
+| Option | Description | Default |
 |------|------|------|
-| Enable split layout | 啟用／停用雙欄版面 | 啟用 |
-| Default Extra Networks panel width | 右欄預設寬度（px） | 520 |
-| Remember panel width after resize | 拖曳後是否記住寬度 | 啟用 |
-| Extra Networks preview pane: viewport offset (px) | 右欄縮圖預覽區相對視窗的垂直留白（px）；數值越大，面板越矮 | 320 |
-| Show Output Browser tab in Extra Networks | 是否顯示 Output Browser 分頁 | 啟用 |
-| Output Browser: maximum number of images to list | 列表最多顯示幾張圖（依修改時間取最新） | 500 |
-| Output Browser: selection outline width (px) | 單擊選取縮圖時的高亮邊線粗度 | 5 |
-| Output Browser: auto-refresh after txt2img/img2img generation completes | 生成完成後自動重新掃描 Output Browser 列表 | 啟用 |
-| Extra Networks tab order | 右欄分頁順序（逗號分隔） | output browser,lora,checkpoints,textual inversion |
-| Default Extra Networks tab on startup | 啟動時預設開啟的分頁 | output_browser |
+| Enable split layout | Enable or disable the split layout | Enabled |
+| Default Extra Networks panel width | Default right-panel width in **single-column mode** (px) | 520 |
+| Remember panel width after resize | Whether to remember width after dragging | Enabled |
+| Extra Networks preview pane: viewport offset (px) | Vertical padding of the right-panel thumbnail preview relative to the viewport (px); larger values make the panel shorter | 320 |
+| Show Output Browser tab in Extra Networks | Whether to show the Output Browser tab | Enabled |
+| Show Wildcard tab in Extra Networks | Whether to show the Wildcard tab | Enabled |
+| Output Browser: maximum number of images to list | Maximum images in the list (newest by modification time) | 500 |
+| Output Browser: selection outline width (px) | Highlight border width when a thumbnail is selected with a single click | 5 |
+| Output Browser: auto-refresh after txt2img/img2img generation completes | Automatically rescan the Output Browser list after generation completes | Enabled |
+| Extra Networks tab order | Tab order on the right (comma-separated) | output browser,wildcard,lora,checkpoints,textual inversion |
+| Default Extra Networks tab on startup | Default tab on startup in **single-column mode** | output_browser |
+| **Extra Networks horizontal columns (1–3)** | Number of horizontal columns on the right; `1` is traditional single-column | 1 |
+| Default width per column (px, multi-column mode) | Default width per column in **multi-column mode** | 520 |
+| Column 1/2/3: Extra Network tabs | Tabs to show in that column (comma-separated slugs; see below) | Column 1: all; columns 2 and 3: empty by default |
+| Column 1/2/3: default tab on startup | Default tab on startup for that column | Column 1: output_browser; column 2: lora; column 3: checkpoints |
 
-變更「啟用」、Output Browser 或預設寬度後，建議執行 **Reload UI**。預覽區 viewport offset（px）變更後通常會立即生效；若未見效果可 **Reload UI**。
+**Tab slugs (for Column tabs settings)**: `output_browser`, `wildcard`, `lora`, `checkpoints`, `textual_inversion` (display names such as `output browser` also work and are normalized automatically).
+
+After changing enable state, Output Browser, Wildcard, column count, or tab configuration, **Reload UI** is recommended. Changes to preview pane viewport offset (px) usually take effect immediately; if not, try **Reload UI**.
+
+### Multi-column layout (Column 1–3)
+
+When **Extra Networks horizontal columns** is set to **2** or **3**:
+
+- **Generation** stays on the left; the right side shows **1–3 vertical columns** side by side, each with its own **tab bar**, **Search/Sort toolbar**, and **content area**.
+- Use **Column N: Extra Network tabs** to specify which tabs appear in that column (e.g. column 1: `output browser,wildcard`; column 2: `lora`; column 3: `checkpoints`).
+- The same tab slug **can be assigned to multiple columns** (tab buttons are cloned), but there is **only one content panel DOM**—it appears in the column where that tab was last selected.
+- **Between columns** and **between Generation and the first column**, there are drag handles; each column width is independent (280–2000 px) and can be saved to `localStorage`.
+- Each column’s **Search filters only that column’s** cards; filters do not affect other columns.
+- When `column_count = 1`, traditional single-column behavior is preserved, using **Default Extra Networks panel width** and **Default Extra Networks tab on startup**.
+
+**Example (2 columns)**
+
+| Setting | Value |
+|------|-----|
+| horizontal columns | 2 |
+| Column 1 tabs | `output browser,wildcard` |
+| Column 2 tabs | `lora,checkpoints` |
+
+### Wildcard
+
+Browses wildcard files from [sd-dynamic-prompts](https://github.com/adieyal/sd-dynamic-prompts) (default directory matches Dynamic Prompts; if not installed, falls back to `extensions/sd-dynamic-prompts/wildcards`).
+
+#### UI
+
+- **Location**: txt2img / img2img → right-side Extra Networks → **Wildcard** tab.
+- **Search bar**: Filter wildcard cards by filename and path (uses Extra Networks search; in multi-column mode, only filters that column).
+- **Folder buttons**: Filter by subdirectory (similar to LoRA and other tabs).
+- **Token format**: Follows Dynamic Prompts `dp_parser_wildcard_wrap` in Settings (default `__name__`).
+
+#### Actions
+
+- **Single-click** a card: **add or remove** the corresponding wildcard token in the left **Prompt** (e.g. `__character__`); wildcards already in the prompt are shown with a highlight border.
+- When editing the Prompt, highlights **sync both ways** (removing a token from the prompt clears the card highlight).
+- **Right-click** a card: open the **line menu** listing each line in the wildcard file; selecting a line **appends it as a new line in the Prompt** (useful for picking a single sentence from a text file instead of the whole `__name__` token).
 
 ### Output Browser
 
-#### 介面
+#### UI
 
-- **位置**：txt2img / img2img → 右側 Extra Networks → **Output Browser** 分頁（可於設定調整分頁順序與啟動預設）。
-- **搜尋列**：依檔名、相對路徑、`txt2img/…` 等關鍵字篩選（沿用 Extra Networks 搜尋）。
-- **工具列**：名稱／日期排序、日期篩選、**Refresh**（與 LoRA 等分頁相同，重新掃描列表）。
-- **txt2img / img2img 按鈕**：快速篩選該模式的輸出（對應 Settings 內各分頁的 samples 路徑）。
-- **縮圖卡片**：底部顯示相對路徑（例如 `txt2img/2026-02-28/0273-1108391704.png`）。
+- **Location**: txt2img / img2img → right-side Extra Networks → **Output Browser** tab (tab order and default on startup can be adjusted in Settings).
+- **Search bar**: Filter by filename, relative path, `txt2img/…`, etc. (uses Extra Networks search).
+- **Toolbar**: Name/date sort, date filter, **Refresh** (same as LoRA and other tabs; rescans the list).
+- **txt2img / img2img buttons**: Quickly filter outputs for that mode (maps to each tab’s samples path in Settings).
+- **Thumbnail cards**: Show relative path at the bottom (e.g. `txt2img/2026-02-28/0273-1108391704.png`).
 
-#### 操作
+#### Actions
 
-- **單擊**卡片：高亮選取（類似檔案總管，邊線粗度可在設定調整）；**Ctrl+單擊**切換選取、**Shift+單擊**從錨點連續選取；**Ctrl+Shift+單擊**在保留既有選取下追加範圍。
-- **雙擊**卡片：以單圖預覽層顯示大圖；**Esc** 或點背景／關閉鈕可關閉預覽。大圖開啟時 **← / →** 切換上一張／下一張；大圖下 **Del** 刪除目前圖片並自動顯示下一張（若無下一張則關閉）。
-- **拖放**卡片至左側 **Prompt**、**畫廊** 或 **Generation** 區：依**目前主分頁**套用 PNG info（txt2img 主分頁 → txt2img 欄位；img2img 主分頁 → img2img 欄位），效果與右鍵 **Send to txt2img/img2img** 相同。
-- **拖放**至 img2img 頁左側 **Init / Sketch / Inpaint** 畫布（ForgeCanvas）：**載入圖片**至目前可見的 image input，等同點選 Load image；**不會**套用 PNG info。拖到 Prompt／畫廊等仍為上述 PNG info 行為。
-- **右鍵**卡片：功能選單
-  - **Send to txt2img** / **Send to img2img**：讀取**右鍵那張**圖的 PNG info，寫入對應分頁欄位並自動切換主分頁（僅單張）。
-  - **Delete**：刪除**目前選取**的圖片（無選取時刪右鍵那張）；刪除前會跳出確認對話框。
-- **Delete 鍵**：在列表已選取圖片時，按 **Del** 與右鍵 Delete 相同（在輸入框內打字時不會觸發；大圖開啟時則刪除目前大圖）。
-- 點 **Refresh**、刪除後重新載入列表，或**生成完成後自動刷新**時，**捲動位置會維持**在 refresh 前的位置，不會跳回最上方。
-- **txt2img / img2img** 每次生成完成後，預設會自動更新 Output Browser 列表；可在設定關閉「auto-refresh after generation completes」。手動點 **Refresh** 仍隨時可用。
+- **Single-click** a card: highlight selection (like a file manager; border width adjustable in Settings); **Ctrl+click** toggles selection, **Shift+click** selects a range from the anchor; **Ctrl+Shift+click** adds a range while keeping existing selection.
+- **Double-click** a card: show a large image in a single-image preview layer; **Esc** or click background / close button to dismiss. While preview is open, **← / →** go to previous/next image; **Del** in preview deletes the current image and shows the next (closes if none).
+- **Drag and drop** a card onto the left **Prompt**, **gallery**, or **Generation** area: applies PNG info based on the **current main tab** (txt2img main tab → txt2img fields; img2img main tab → img2img fields)—same as right-click **Send to txt2img/img2img**.
+- **Drag and drop** onto img2img **Init / Sketch / Inpaint** canvas (ForgeCanvas) on the left: **loads the image** into the currently visible image input, same as Load image; **does not** apply PNG info. Dragging to Prompt/gallery still uses PNG info behavior above.
+- **Right-click** a card: context menu
+  - **Send to txt2img** / **Send to img2img**: read PNG info from **the right-clicked image**, write to the corresponding tab fields, and switch the main tab (single image only).
+  - **Delete**: delete **currently selected** images (if none selected, deletes the right-clicked image); confirmation dialog before delete.
+- **Delete key**: when images are selected in the list, **Del** behaves like right-click Delete (does not trigger while typing in an input; in full-size preview, deletes the current image).
+- List reloads when clicking **Refresh**, after delete, or on **auto-refresh after generation completes**.
+- After each txt2img / img2img generation, Output Browser refreshes by default; disable with “auto-refresh after generation completes” in Settings. **Refresh** remains available anytime.
 
-## 目錄結構
+## Directory structure
 
 ```
 forge-split-extra-networks/
 ├── README.md
-├── preview.png              # 預覽圖
+├── preview.png              # Preview screenshot
 ├── metadata.ini
-├── style.css                # 雙欄 Grid 樣式
+├── style.css                # Split / multi-column grid styles
 ├── ui_extra_networks_output_browser.py
+├── ui_extra_networks_wildcard.py
 ├── javascript/
 │   ├── split_extra_networks.js
-│   └── output_browser.js
+│   ├── output_browser.js
+│   └── wildcard.js
 └── scripts/
-    ├── split_extra_networks.py   # 設定項與 Output Browser 註冊
-    └── output_browser_api.py     # infotext / delete API
+    ├── split_extra_networks.py   # Settings and EN tab registration
+    ├── output_browser_api.py     # Output Browser infotext / delete API
+    └── wildcard_api.py           # Wildcard line-list API
 ```
 
-## 卸載
+## Uninstall
 
-刪除 `extensions/forge-split-extra-networks` 資料夾後重新啟動 WebUI 即可，不會殘留對核心檔的修改。
+Delete the `extensions/forge-split-extra-networks` folder and restart the WebUI. No changes to core files remain.
 
-## 授權
+## License
 
-請依本儲存庫所附的授權條款使用（若未另行標示，建議以 MIT 或與主程式相容之開源授權發佈）。
+Use according to the license included with this repository (if not otherwise stated, MIT or an open-source license compatible with the main project is recommended).
 
-## 致謝
+## Acknowledgments
 
 - [Stable Diffusion WebUI Forge - Neo](https://github.com/Haoming02/Stable-Diffusion-Webui-Forge-Neo)
-- Automatic1111 / Gradio 社群的 Extra Networks 介面設計
+- Automatic1111 / Gradio community Extra Networks UI design
