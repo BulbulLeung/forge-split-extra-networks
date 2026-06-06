@@ -25,7 +25,7 @@ shared.options_templates.update(
                 520,
                 "Default Extra Networks panel width (px)",
                 gr.Slider,
-                {"minimum": 280, "maximum": 1200, "step": 10},
+                {"minimum": 280, "maximum": 2000, "step": 10},
             ),
             "forge_en_split_remember_width": shared.OptionInfo(
                 True,
