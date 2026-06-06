@@ -491,3 +491,26 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Open Folder control (Output Browser / Wildcard toolbar) */
+.extra-network-control .extra-network-control--open-folder {
+    padding: 0.25rem;
+    display: inline-flex;
+    cursor: pointer;
+    justify-self: center;
+    align-self: center;
+}
+
+.extra-network-control .extra-network-control--open-folder .extra-network-control--open-folder-icon {
+    height: 1.5rem;
+    width: 1.5rem;
+    mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>');
+    mask-repeat: no-repeat;
+    mask-position: center center;
+    mask-size: 100%;
+    background-color: var(--input-placeholder-color);
+}
+
+.extra-network-control .extra-network-control--open-folder-icon:active {
+    background-color: var(--button-secondary-text-color);
+}

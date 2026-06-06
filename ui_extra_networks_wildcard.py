@@ -2,6 +2,7 @@ import html
 import os
 from typing import Optional
 
+from forge_en_folder import inject_open_folder_button
 from modules import shared, ui_extra_networks
 
 
@@ -43,6 +44,16 @@ class ExtraNetworksPageWildcard(ui_extra_networks.ExtraNetworksPage):
 
     def refresh(self):
         self.lister.reset()
+
+    def create_html(self, tabname, *, empty=False):
+        html_content = super().create_html(tabname, empty=empty)
+        return inject_open_folder_button(
+            html_content,
+            tabname,
+            self.extra_networks_tabname,
+            "forgeEnWildcardOpenFolder",
+            "Open wildcard folder",
+        )
 
     def _wildcard_dir(self) -> str:
         return get_wildcard_directory()

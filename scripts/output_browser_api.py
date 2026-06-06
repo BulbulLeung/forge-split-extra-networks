@@ -14,6 +14,7 @@ _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _EXT_DIR not in sys.path:
     sys.path.insert(0, _EXT_DIR)
 
+from forge_en_folder import try_open_folder
 from ui_extra_networks_output_browser import ExtraNetworksPageOutputBrowser
 
 
@@ -241,6 +242,17 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
             raise
         except Exception as e:
             return _apply_response(None, [], str(e))
+
+    @app.get("/forge-en-output-browser/open-folder")
+    async def open_output_folder(tabname: str = "txt2img"):
+        if tabname not in ("txt2img", "img2img"):
+            return {"ok": False, "error": "invalid tabname"}
+
+        outdir = ExtraNetworksPageOutputBrowser._resolve_outdir(tabname)
+        result = await asyncio.to_thread(try_open_folder, outdir)
+        if result.get("ok"):
+            return result
+        return {"ok": False, "error": result.get("error") or "Failed to open folder"}
 
     @app.get("/forge-en-output-browser/pane-html")
     async def get_pane_html(tabname: str = "txt2img"):

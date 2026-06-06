@@ -319,6 +319,36 @@ function forgeEnWildcardFetchLines(filepath) {
     });
 }
 
+function forgeEnWildcardOpenFolder(event, tabname) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    fetch("/forge-en-wildcard/open-folder")
+        .then(function (response) {
+            return response.json().then(function (data) {
+                if (!response.ok) {
+                    const message =
+                        data.error ||
+                        (typeof data.detail === "string"
+                            ? data.detail
+                            : response.statusText);
+                    throw new Error(message);
+                }
+                return data;
+            });
+        })
+        .then(function (data) {
+            if (!data.ok && data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(function (err) {
+            alert(err.message || "Failed to open folder");
+        });
+}
+
 function forgeEnWildcardEnsureContextMenu() {
     if (forgeEnWildcardContextMenuEl) {
         return forgeEnWildcardContextMenuEl;

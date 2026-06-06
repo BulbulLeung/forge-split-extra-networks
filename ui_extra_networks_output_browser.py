@@ -2,6 +2,7 @@ import html
 import os
 from typing import Optional
 
+from forge_en_folder import inject_open_folder_button
 from modules import shared, ui_extra_networks
 from modules.ui_extra_networks import allowed_preview_extensions, quote_js
 
@@ -41,7 +42,14 @@ class ExtraNetworksPageOutputBrowser(ui_extra_networks.ExtraNetworksPage):
 
     def create_html(self, tabname, *, empty=False):
         self._current_tabname = tabname
-        return super().create_html(tabname, empty=empty)
+        html_content = super().create_html(tabname, empty=empty)
+        return inject_open_folder_button(
+            html_content,
+            tabname,
+            self.extra_networks_tabname,
+            "forgeEnOutputBrowserOpenFolder",
+            "Open output folder",
+        )
 
     def _folder_buttons_html(self, tabname: str) -> str:
         subdirs = {}

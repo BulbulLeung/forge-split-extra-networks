@@ -277,6 +277,30 @@ function forgeEnOutputBrowserParseJsonResponse(response) {
     });
 }
 
+function forgeEnOutputBrowserOpenFolder(event, tabname) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const url =
+        forgeEnOutputBrowserApiUrl(
+            "/forge-en-output-browser/open-folder?tabname=" +
+                encodeURIComponent(tabname),
+        );
+
+    fetch(url)
+        .then(forgeEnOutputBrowserParseJsonResponse)
+        .then(function (data) {
+            if (!data.ok && data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(function (err) {
+            alert(err.message || "Failed to open folder");
+        });
+}
+
 function forgeEnOutputBrowserGetCards(container) {
     return Array.from(container.querySelectorAll(".card"));
 }

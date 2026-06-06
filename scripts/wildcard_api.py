@@ -1,3 +1,5 @@
+import asyncio
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -11,6 +13,7 @@ _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _EXT_DIR not in sys.path:
     sys.path.insert(0, _EXT_DIR)
 
+from forge_en_folder import try_open_folder
 from ui_extra_networks_wildcard import get_wildcard_directory
 
 _MAX_LINES = 1000
@@ -51,6 +54,14 @@ def parse_wildcard_lines(path: Path) -> list[str]:
 
 
 def register_wildcard_routes(_: gr.Blocks, app: FastAPI):
+    @app.get("/forge-en-wildcard/open-folder")
+    async def open_wildcard_folder():
+        wildcard_dir = get_wildcard_directory()
+        result = await asyncio.to_thread(try_open_folder, wildcard_dir)
+        if result.get("ok"):
+            return result
+        return {"ok": False, "error": result.get("error") or "Failed to open folder"}
+
     @app.get("/forge-en-wildcard/lines")
     async def get_wildcard_lines(filename: str = ""):
         if not filename:
