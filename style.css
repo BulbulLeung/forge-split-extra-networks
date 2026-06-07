@@ -914,3 +914,14 @@
 .dark #img2img_en_prompt_pane .forge-en-prompt-tag--newline {
     background-color: rgba(128, 128, 128, 0.28);
 }
+
+/* txt2img/img2img: hide prompt/params below gallery; keep performance stats */
+#html_info_txt2img,
+#html_info_img2img {
+    display: none !important;
+}
+
+#html_log_txt2img .comments,
+#html_log_img2img .comments {
+    display: none !important;
+}
