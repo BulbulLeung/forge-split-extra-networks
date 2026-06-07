@@ -710,6 +710,19 @@
     margin-bottom: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    position: relative;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-drop-line,
+#img2img_en_prompt_pane .forge-en-prompt-drop-line {
+    position: absolute;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--color-accent, #4a9eff);
+    box-shadow: 0 0 6px rgba(74, 158, 255, 0.55);
+    pointer-events: none;
+    z-index: 2;
+    display: none;
 }
 
 #txt2img_en_prompt_pane .forge-en-prompt-tag,
@@ -718,6 +731,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: grab;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--dragging,
+#img2img_en_prompt_pane .forge-en-prompt-tag--dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tags.forge-en-prompt-tags--dragging,
+#img2img_en_prompt_pane .forge-en-prompt-tags.forge-en-prompt-tags--dragging {
+    user-select: none;
 }
 
 #txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard,

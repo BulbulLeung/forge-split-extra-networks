@@ -12,6 +12,10 @@ const FORGE_EN_PROMPT_TAG_CLASS_LORA = "forge-en-prompt-tag--lora";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
 const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+>$/i;
 const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+\)$/i;
+const FORGE_EN_PROMPT_DRAG_THRESHOLD_PX = 6;
+const FORGE_EN_PROMPT_TAG_CLASS_DRAGGING = "forge-en-prompt-tag--dragging";
+const FORGE_EN_PROMPT_DROP_LINE_CLASS = "forge-en-prompt-drop-line";
+const FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING = "forge-en-prompt-tags--dragging";
 
 const forgeEnPromptBound = {
     prompt: Object.create(null),
@@ -22,6 +26,8 @@ const forgeEnPromptBound = {
 let forgeEnPromptInsertPopoverEl = null;
 let forgeEnPromptInsertPopoverState = null;
 let forgeEnPromptAfterUiUpdatePending = null;
+let forgeEnPromptDragState = null;
+let forgeEnPromptDragSuppressClick = false;
 
 function forgeEnPromptTabnameFull(tabname) {
     return tabname + "_" + FORGE_EN_PROMPT_PAGE;
@@ -170,6 +176,162 @@ function forgeEnPromptRemoveAt(tabname, index) {
 
     parts.splice(index, 1);
     forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptGetInsertAt(fromIndex, toIndex, insertBefore) {
+    if (insertBefore) {
+        return fromIndex < toIndex ? toIndex - 1 : toIndex;
+    }
+    return fromIndex < toIndex ? toIndex : toIndex + 1;
+}
+
+function forgeEnPromptMoveBefore(tabname, fromIndex, toIndex) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (fromIndex < 0 || fromIndex >= parts.length) return;
+    if (toIndex < 0 || toIndex >= parts.length) return;
+
+    const insertAt = forgeEnPromptGetInsertAt(fromIndex, toIndex, true);
+    if (insertAt === fromIndex) return;
+
+    const item = parts.splice(fromIndex, 1)[0];
+    parts.splice(insertAt, 0, item);
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptMoveAfter(tabname, fromIndex, toIndex) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (fromIndex < 0 || fromIndex >= parts.length) return;
+    if (toIndex < 0 || toIndex >= parts.length) return;
+
+    const insertAt = forgeEnPromptGetInsertAt(fromIndex, toIndex, false);
+    if (insertAt === fromIndex) return;
+
+    const item = parts.splice(fromIndex, 1)[0];
+    parts.splice(insertAt, 0, item);
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptClearDragVisuals(container) {
+    if (!container) return;
+    container.classList.remove(FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING);
+    container
+        .querySelectorAll("." + FORGE_EN_PROMPT_TAG_CLASS_DRAGGING)
+        .forEach(function (el) {
+            el.classList.remove(FORGE_EN_PROMPT_TAG_CLASS_DRAGGING);
+        });
+    forgeEnPromptHideDropLine(container);
+}
+
+function forgeEnPromptEnsureDropLine(container) {
+    let line = container.querySelector("." + FORGE_EN_PROMPT_DROP_LINE_CLASS);
+    if (!line) {
+        line = document.createElement("div");
+        line.className = FORGE_EN_PROMPT_DROP_LINE_CLASS;
+        line.style.display = "none";
+        container.appendChild(line);
+    }
+    return line;
+}
+
+function forgeEnPromptHideDropLine(container) {
+    if (!container) return;
+    const line = container.querySelector("." + FORGE_EN_PROMPT_DROP_LINE_CLASS);
+    if (line) {
+        line.style.display = "none";
+    }
+}
+
+function forgeEnPromptShowDropLine(container, targetButton, insertBefore) {
+    const line = forgeEnPromptEnsureDropLine(container);
+    const containerRect = container.getBoundingClientRect();
+    const btnRect = targetButton.getBoundingClientRect();
+    const gapRaw = getComputedStyle(container).columnGap || getComputedStyle(container).gap;
+    const gapPx = parseFloat(gapRaw) || 5.6;
+    const lineWidth = 2;
+    let left;
+    if (insertBefore) {
+        left =
+            btnRect.left -
+            containerRect.left +
+            container.scrollLeft -
+            (gapPx + lineWidth) / 2;
+    } else {
+        left =
+            btnRect.right -
+            containerRect.left +
+            container.scrollLeft +
+            (gapPx - lineWidth) / 2;
+    }
+    const top = btnRect.top - containerRect.top + container.scrollTop;
+
+    line.style.display = "block";
+    line.style.left = Math.round(left) + "px";
+    line.style.top = Math.round(top) + "px";
+    line.style.height = Math.round(btnRect.height) + "px";
+}
+
+function forgeEnPromptResetDragState(container) {
+    forgeEnPromptClearDragVisuals(container);
+    forgeEnPromptDragState = null;
+}
+
+function forgeEnPromptFinishDrag(event, container) {
+    if (!forgeEnPromptDragState || forgeEnPromptDragState.container !== container) {
+        return;
+    }
+
+    const state = forgeEnPromptDragState;
+    if (
+        state.sourceButton &&
+        state.sourceButton.hasPointerCapture &&
+        state.sourceButton.hasPointerCapture(event.pointerId)
+    ) {
+        try {
+            state.sourceButton.releasePointerCapture(event.pointerId);
+        } catch (_err) {
+            /* ignore */
+        }
+    }
+
+    if (state.dragging) {
+        event.preventDefault();
+        event.stopPropagation();
+        forgeEnPromptDragSuppressClick = true;
+        if (
+            state.dropIndex !== null &&
+            !Number.isNaN(state.dropIndex) &&
+            state.insertBefore !== null
+        ) {
+            const insertAt = forgeEnPromptGetInsertAt(
+                state.fromIndex,
+                state.dropIndex,
+                state.insertBefore,
+            );
+            if (insertAt !== state.fromIndex) {
+                if (state.insertBefore) {
+                    forgeEnPromptMoveBefore(
+                        state.tabname,
+                        state.fromIndex,
+                        state.dropIndex,
+                    );
+                } else {
+                    forgeEnPromptMoveAfter(
+                        state.tabname,
+                        state.fromIndex,
+                        state.dropIndex,
+                    );
+                }
+            }
+        }
+    }
+
+    forgeEnPromptResetDragState(container);
 }
 
 function forgeEnPromptHideInsertPopover() {
@@ -351,7 +513,101 @@ function forgeEnPromptBindTagsContainers() {
 
         forgeEnPromptBound.tags[tabname] = container;
 
+        container.addEventListener("pointerdown", function (event) {
+            if (event.button !== 0) return;
+            const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+            if (!button || !container.contains(button)) return;
+
+            const index = parseInt(button.dataset.index, 10);
+            if (Number.isNaN(index)) return;
+
+            forgeEnPromptDragState = {
+                tabname: tabname,
+                container: container,
+                fromIndex: index,
+                sourceButton: button,
+                startX: event.clientX,
+                startY: event.clientY,
+                dragging: false,
+                dropIndex: null,
+                insertBefore: null,
+                pointerId: event.pointerId,
+            };
+
+            if (button.setPointerCapture) {
+                button.setPointerCapture(event.pointerId);
+            }
+        });
+
+        container.addEventListener("pointermove", function (event) {
+            if (
+                !forgeEnPromptDragState ||
+                forgeEnPromptDragState.container !== container ||
+                event.pointerId !== forgeEnPromptDragState.pointerId
+            ) {
+                return;
+            }
+
+            const state = forgeEnPromptDragState;
+            if (!state.dragging) {
+                const dx = event.clientX - state.startX;
+                const dy = event.clientY - state.startY;
+                if (
+                    Math.hypot(dx, dy) <
+                    FORGE_EN_PROMPT_DRAG_THRESHOLD_PX
+                ) {
+                    return;
+                }
+                state.dragging = true;
+                container.classList.add(FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING);
+                state.sourceButton.classList.add(
+                    FORGE_EN_PROMPT_TAG_CLASS_DRAGGING,
+                );
+                forgeEnPromptHideInsertPopover();
+            }
+
+            forgeEnPromptHideDropLine(container);
+
+            const under = document.elementFromPoint(
+                event.clientX,
+                event.clientY,
+            );
+            const target =
+                under &&
+                under.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+            if (
+                target &&
+                container.contains(target) &&
+                target !== state.sourceButton
+            ) {
+                const rect = target.getBoundingClientRect();
+                const insertBefore =
+                    event.clientX < rect.left + rect.width / 2;
+                forgeEnPromptShowDropLine(container, target, insertBefore);
+                state.dropIndex = parseInt(target.dataset.index, 10);
+                state.insertBefore = insertBefore;
+            } else {
+                state.dropIndex = null;
+                state.insertBefore = null;
+            }
+        });
+
+        container.addEventListener("pointerup", function (event) {
+            forgeEnPromptFinishDrag(event, container);
+        });
+
+        container.addEventListener("pointercancel", function (event) {
+            forgeEnPromptFinishDrag(event, container);
+        });
+
         container.addEventListener("click", function (event) {
+            if (!forgeEnPromptDragSuppressClick) return;
+            event.preventDefault();
+            event.stopPropagation();
+            forgeEnPromptDragSuppressClick = false;
+        });
+
+        container.addEventListener("dblclick", function (event) {
             const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
             if (!button || !container.contains(button)) return;
 
