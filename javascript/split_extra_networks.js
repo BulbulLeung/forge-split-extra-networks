@@ -302,6 +302,7 @@ function forgeEnSplitSelectDefaultTab(splitRoot, tabname) {
 
 const FORGE_EN_KNOWN_TAB_META = {
     output_browser: { allowPrompt: false, allowNegative: false },
+    en_prompt: { allowPrompt: false, allowNegative: false },
     wildcard: { allowPrompt: false, allowNegative: false },
     lora: { allowPrompt: true, allowNegative: false },
     checkpoints: { allowPrompt: true, allowNegative: false },

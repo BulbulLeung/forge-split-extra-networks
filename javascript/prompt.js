@@ -401,6 +401,62 @@ function forgeEnPromptInstallSortGuard(tabname) {
     };
 }
 
+function forgeEnPromptHideToolbar(tabname) {
+    const app = gradioApp();
+    if (!app) return;
+
+    const tabnameFull = forgeEnPromptTabnameFull(tabname);
+    const controls = app.querySelector("#" + tabnameFull + "_controls");
+    if (controls) {
+        controls.style.display = "none";
+    }
+}
+
+function forgeEnPromptRestoreColumnControls(tabname) {
+    const app = gradioApp();
+    if (!app) return;
+
+    app.querySelectorAll(
+        "#" + tabname + "_extra_tabs .forge-en-column",
+    ).forEach(function (column) {
+        if (column.dataset.forgeEnActiveSlug === FORGE_EN_PROMPT_PAGE) {
+            return;
+        }
+        const columnControls = column.querySelector(".forge-en-column-controls");
+        if (columnControls) {
+            columnControls.style.removeProperty("display");
+        }
+    });
+}
+
+function forgeEnPromptHideAllToolbars() {
+    FORGE_EN_PROMPT_TABNAMES.forEach(forgeEnPromptHideToolbar);
+}
+
+function forgeEnPromptRestoreAllColumnControls() {
+    FORGE_EN_PROMPT_TABNAMES.forEach(forgeEnPromptRestoreColumnControls);
+}
+
+function forgeEnPromptInstallControlsHook() {
+    if (
+        typeof extraNetworksShowControlsForPage === "undefined" ||
+        extraNetworksShowControlsForPage._forgeEnPromptHook
+    ) {
+        return;
+    }
+
+    const original = extraNetworksShowControlsForPage;
+    extraNetworksShowControlsForPage = function (tabname, tabnameFull) {
+        original.apply(this, arguments);
+        if (tabnameFull === forgeEnPromptTabnameFull(tabname)) {
+            forgeEnPromptHideToolbar(tabname);
+        } else if (tabnameFull) {
+            forgeEnPromptRestoreColumnControls(tabname);
+        }
+    };
+    extraNetworksShowControlsForPage._forgeEnPromptHook = true;
+}
+
 function forgeEnPromptInstallTabSelectHook() {
     if (
         typeof extraNetworksTabSelected === "undefined" ||
@@ -417,15 +473,14 @@ function forgeEnPromptInstallTabSelectHook() {
         showNegativePrompt,
         tabnameFull,
     ) {
-        if (
-            tabnameFull === forgeEnPromptTabnameFull("txt2img") ||
-            tabnameFull === forgeEnPromptTabnameFull("img2img")
-        ) {
-            forgeEnPromptInstallSortGuard(
-                tabnameFull.indexOf("txt2img") === 0 ? "txt2img" : "img2img",
-            );
+        const result = original.apply(this, arguments);
+        if (tabnameFull === forgeEnPromptTabnameFull(tabname)) {
+            forgeEnPromptInstallSortGuard(tabname);
+            forgeEnPromptHideToolbar(tabname);
+        } else if (tabnameFull) {
+            forgeEnPromptRestoreColumnControls(tabname);
         }
-        return original.apply(this, arguments);
+        return result;
     };
     extraNetworksTabSelected._forgeEnPromptHook = true;
 }
@@ -434,8 +489,11 @@ function forgeEnPromptInit() {
     forgeEnPromptBindPromptListeners();
     forgeEnPromptBindTagsContainers();
     forgeEnPromptInstallTabSelectHook();
+    forgeEnPromptInstallControlsHook();
     forgeEnPromptInstallSortGuard("txt2img");
     forgeEnPromptInstallSortGuard("img2img");
+    forgeEnPromptHideAllToolbars();
+    forgeEnPromptRestoreAllColumnControls();
     forgeEnPromptSyncAllTags();
 }
 

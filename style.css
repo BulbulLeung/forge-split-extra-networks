@@ -650,6 +650,33 @@
     display: none;
 }
 
+/* Prompt tab: hide search/sort/refresh toolbar */
+#txt2img_en_prompt_controls,
+#img2img_en_prompt_controls {
+    display: none !important;
+}
+
+#txt2img_en_prompt_pane > .extra-network-control,
+#img2img_en_prompt_pane > .extra-network-control {
+    display: none !important;
+}
+
+#txt2img_extra_tabs .tab-nav:has(#txt2img_en_prompt.selected)
+    .extra-networks-controls-div,
+#img2img_extra_tabs .tab-nav:has(#img2img_en_prompt.selected)
+    .extra-networks-controls-div {
+    display: none !important;
+}
+
+.forge-en-column[data-forge-en-active-slug="en_prompt"] .forge-en-column-controls {
+    display: none !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+}
+
 /* Prompt tab: tag list fills pane (no 3-row limit, no preview area) */
 #txt2img_en_prompt_pane #txt2img_en_prompt_dirs:empty,
 #img2img_en_prompt_pane #img2img_en_prompt_dirs:empty {
