@@ -84,6 +84,12 @@ shared.options_templates.update(
                 True,
                 "Show Wildcard tab in Extra Networks",
             ).needs_reload_ui(),
+            "forge_en_lora_weight_button_size": shared.OptionInfo(
+                "Medium",
+                "Lora weight button size",
+                gr.Radio,
+                {"choices": ("Small", "Medium", "Big")},
+            ),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
                 "output browser,wildcard,lora,checkpoints,textual inversion",
                 "Extra Networks tab order (comma-separated page names)",

@@ -384,13 +384,19 @@
     color: #fff;
     font-size: clamp(
         8px,
-        calc(var(--forge-en-lora-card-width, 120px) * 0.085),
-        16px
+        calc(
+            var(--forge-en-lora-card-width, 120px) *
+                var(--forge-en-lora-weight-font-scale, 0.085)
+        ),
+        var(--forge-en-lora-weight-font-max, 16px)
     );
     line-height: 1;
     pointer-events: auto;
     user-select: none;
-    max-width: calc(var(--forge-en-lora-card-width, 120px) * 0.92);
+    max-width: calc(
+        var(--forge-en-lora-card-width, 120px) *
+            var(--forge-en-lora-weight-max-ratio, 0.92)
+    );
 }
 
 #txt2img_lora_cards .card.forge-en-lora-active .forge-en-lora-weight-overlay,

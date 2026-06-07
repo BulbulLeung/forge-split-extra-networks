@@ -14,6 +14,61 @@ const forgeEnLoraBound = {
     cards: Object.create(null),
 };
 
+const FORGE_EN_LORA_WEIGHT_SIZE_PRESETS = {
+    small: {
+        fontScale: 0.055,
+        fontMax: "12px",
+        maxRatio: 0.72,
+    },
+    medium: {
+        fontScale: 0.085,
+        fontMax: "16px",
+        maxRatio: 0.92,
+    },
+    big: {
+        fontScale: 0.13,
+        fontMax: "28px",
+        maxRatio: 0.98,
+    },
+};
+
+function forgeEnLoraWeightButtonSize() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.forge_en_lora_weight_button_size != null
+    ) {
+        const normalized = String(opts.forge_en_lora_weight_button_size)
+            .trim()
+            .toLowerCase();
+        if (normalized in FORGE_EN_LORA_WEIGHT_SIZE_PRESETS) {
+            return normalized;
+        }
+    }
+    return "medium";
+}
+
+function forgeEnLoraApplyWeightButtonSize() {
+    const root = gradioApp();
+    if (!root) return;
+
+    const preset =
+        FORGE_EN_LORA_WEIGHT_SIZE_PRESETS[forgeEnLoraWeightButtonSize()] ||
+        FORGE_EN_LORA_WEIGHT_SIZE_PRESETS.medium;
+
+    root.style.setProperty(
+        "--forge-en-lora-weight-font-scale",
+        String(preset.fontScale),
+    );
+    root.style.setProperty(
+        "--forge-en-lora-weight-font-max",
+        preset.fontMax,
+    );
+    root.style.setProperty(
+        "--forge-en-lora-weight-max-ratio",
+        String(preset.maxRatio),
+    );
+}
+
 function forgeEnLoraGetPromptTextarea(tabname) {
     if (
         typeof activePromptTextarea !== "undefined" &&
@@ -705,6 +760,7 @@ function forgeEnLoraSetup() {
     if (typeof forgeEnOutputBrowserApplySelectionStyle === "function") {
         forgeEnOutputBrowserApplySelectionStyle();
     }
+    forgeEnLoraApplyWeightButtonSize();
     forgeEnLoraBindPromptListeners();
     forgeEnLoraBindCardContainers();
 }
@@ -728,4 +784,8 @@ if (typeof onUiLoaded === "function") {
 
 if (typeof onAfterUiUpdate === "function") {
     onAfterUiUpdate(forgeEnLoraOnAfterUiUpdate);
+}
+
+if (typeof onOptionsChanged === "function") {
+    onOptionsChanged(forgeEnLoraApplyWeightButtonSize);
 }
