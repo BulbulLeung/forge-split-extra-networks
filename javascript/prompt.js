@@ -437,6 +437,8 @@ function forgeEnPromptInsertAfter(tabname, index, newText) {
 }
 
 function forgeEnPromptRemoveAt(tabname, index) {
+    forgeEnPromptHideTagTooltip();
+
     const textarea = forgeEnPromptGetTextarea(tabname);
     if (!textarea) return;
 
@@ -1046,6 +1048,14 @@ function forgeEnPromptHideInsertPopover() {
     forgeEnPromptInsertPopoverState = null;
 }
 
+function forgeEnPromptUpdateInsertPopoverHelp(popover, mode) {
+    if (!popover) return;
+    const help = popover.querySelector(".forge-en-prompt-insert-help");
+    if (!help) return;
+    const show = mode === "insert" && forgeEnPromptLocalAiEnabled();
+    help.style.display = show ? "block" : "none";
+}
+
 function forgeEnPromptEnsureInsertPopover() {
     if (forgeEnPromptInsertPopoverEl) {
         return forgeEnPromptInsertPopoverEl;
@@ -1059,6 +1069,11 @@ function forgeEnPromptEnsureInsertPopover() {
     popover.style.display = "none";
     popover.innerHTML =
         '<input type="text" class="forge-en-prompt-insert-input" autocomplete="off" spellcheck="false" />' +
+        '<div class="forge-en-prompt-insert-help" style="display:none">' +
+        "<div>Plain text: English is inserted directly; non-English is translated to English first.</div>" +
+        "<div># prefix: Local AI generates SD prompt tags from a sentence (multiple tags supported).</div>" +
+        '<div class="forge-en-prompt-insert-help__example">e.g. <span class="forge-en-prompt-insert-help__sample"># a girl in red dress by the window</span> → <span class="forge-en-prompt-insert-help__sample">1girl, red dress, window, indoors</span></div>' +
+        "</div>" +
         '<div class="forge-en-prompt-insert-status" style="display:none"></div>' +
         '<div class="forge-en-prompt-insert-actions">' +
         '<button type="button" class="forge-en-prompt-insert-confirm lg primary gradio-button custom-button">Insert</button>' +
@@ -1186,6 +1201,7 @@ function forgeEnPromptShowPopover(anchor, tabname, index, mode, initialText) {
         confirmBtn.textContent = popoverMode === "edit" ? "Save" : "Insert";
         confirmBtn.disabled = false;
     }
+    forgeEnPromptUpdateInsertPopoverHelp(popover, popoverMode);
     forgeEnPromptSetInsertStatus("", false);
     forgeEnPromptSetInsertLoading(false);
     forgeEnPromptPositionInsertPopover(popover, anchor);

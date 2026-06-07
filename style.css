@@ -873,8 +873,8 @@
     z-index: 1004;
     flex-direction: column;
     gap: 0.45rem;
-    min-width: 14rem;
-    max-width: min(90vw, 24rem);
+    min-width: 28rem;
+    max-width: min(90vw, 40rem);
     padding: 0.55rem 0.65rem;
     border-radius: 6px;
     background: var(--body-background-fill, #2b2b2b);
@@ -891,6 +891,29 @@
     background: var(--input-background-fill, #1f1f1f);
     color: var(--body-text-color, #eee);
     font-size: 0.9rem;
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-help {
+    display: none;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--body-text-color-subdued, #aaa);
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-help > div + div {
+    margin-top: 0.25rem;
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-help__example {
+    margin-top: 0.2rem;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    color: var(--body-text-color-subdued, #999);
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-help__sample {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    word-break: break-word;
 }
 
 .forge-en-prompt-insert-popover .forge-en-prompt-insert-actions {
