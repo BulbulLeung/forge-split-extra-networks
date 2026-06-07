@@ -721,6 +721,10 @@ function forgeEnLoraSyncHighlights(tabname) {
         if (!card) return;
         forgeEnLoraSetCardActive(card, tabname, weight);
     });
+
+    if (typeof forgeEnEnabledFilterReapply === "function") {
+        forgeEnEnabledFilterReapply(tabname, "lora");
+    }
 }
 
 function forgeEnLoraSyncAllHighlights() {

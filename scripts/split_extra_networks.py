@@ -11,7 +11,13 @@ for _path in (_EXT_DIR, _SCRIPTS_DIR):
         sys.path.insert(0, _path)
 
 _EXT_JS_DIR = os.path.join(_EXT_DIR, "javascript")
-_EXT_JS_FILES = ("split_extra_networks.js", "output_browser.js", "wildcard.js", "lora.js")
+_EXT_JS_FILES = (
+    "split_extra_networks.js",
+    "output_browser.js",
+    "enabled_filter.js",
+    "wildcard.js",
+    "lora.js",
+)
 
 _FORGE_EN_TAB_CHOICES = [
     "output_browser",

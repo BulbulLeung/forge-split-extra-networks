@@ -354,6 +354,10 @@ function forgeEnWildcardSyncHighlights(tabname) {
             card.classList.remove(FORGE_EN_WILDCARD_ACTIVE_CLASS);
         }
     });
+
+    if (typeof forgeEnEnabledFilterReapply === "function") {
+        forgeEnEnabledFilterReapply(tabname, "wildcard");
+    }
 }
 
 function forgeEnWildcardSyncAllHighlights() {

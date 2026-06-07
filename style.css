@@ -355,6 +355,16 @@
     cursor: pointer;
 }
 
+.extra-network-dirs .forge-en-filter-enabled.forge-en-filter-enabled-active {
+    background-color: rgba(74, 158, 255, 0.22);
+    outline: 2px solid var(--color-accent, #4a9eff);
+    outline-offset: -1px;
+}
+
+.dark .extra-network-dirs .forge-en-filter-enabled.forge-en-filter-enabled-active {
+    background-color: rgba(74, 158, 255, 0.28);
+}
+
 /* Lora: prompt-active highlight (same outline setting as Wildcard) */
 #txt2img_lora_cards .card.forge-en-lora-active,
 #img2img_lora_cards .card.forge-en-lora-active {
