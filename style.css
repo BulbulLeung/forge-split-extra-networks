@@ -1,5 +1,13 @@
 /* forge-split-extra-networks: Generation left, Extra Networks right */
 
+:root {
+    --forge-en-tab-nav-height: 2.7rem;
+    --forge-en-column-controls-height: 2.25rem;
+    --forge-en-split-row-gap: 0.25rem;
+    /* Tab 列實際高度常高於 min-height（含 Search/Sort）；左欄補齊對齊 */
+    --forge-en-left-height-adjust: 1.5rem;
+}
+
 #txt2img_extra_tabs.forge-en-split,
 #img2img_extra_tabs.forge-en-split,
 #txt2img_extra_tabs > .tabs.forge-en-split,
@@ -25,7 +33,7 @@
 #img2img_extra_tabs.gradio-tabs.forge-en-split > .tab-nav {
     grid-column: 3;
     grid-row: 1;
-    min-height: 2.7rem;
+    min-height: var(--forge-en-tab-nav-height, 2.7rem);
 }
 
 #txt2img_extra_tabs.forge-en-split > .forge-en-resize-handle,
@@ -67,6 +75,49 @@
     flex-direction: column;
     visibility: visible !important;
     min-width: 0;
+    height: calc(
+        100vh - var(--forge-en-pane-offset-px, 320px) +
+            var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-split-row-gap, 0.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
+    min-height: calc(
+        24rem + var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-split-row-gap, 0.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
+    max-height: calc(
+        100vh - var(--forge-en-pane-offset-px, 320px) +
+            var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-split-row-gap, 0.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#txt2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar,
+#img2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar {
+    background-color: transparent;
+    width: 16px;
+}
+
+#txt2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-track,
+#img2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-track {
+    background-color: transparent;
+    background-clip: content-box;
+}
+
+#txt2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-thumb,
+#img2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-thumb {
+    background-color: var(--border-color-primary);
+    border-radius: 16px;
+    border: 4px solid var(--background-fill-primary);
+}
+
+#txt2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-button,
+#img2img_extra_tabs.forge-en-split .forge-en-left::-webkit-scrollbar-button {
+    display: none;
 }
 
 #txt2img_extra_tabs.forge-en-split .forge-en-left.hidden,
@@ -113,6 +164,28 @@
 .forge-en-split.forge-en-multi-column {
     grid-template-columns:
         minmax(0, 1fr) 6px var(--forge-en-columns-total-width, 1046px) !important;
+}
+
+.forge-en-split.forge-en-multi-column .forge-en-left,
+#txt2img_extra_tabs.forge-en-split.forge-en-multi-column .forge-en-left,
+#img2img_extra_tabs.forge-en-split.forge-en-multi-column .forge-en-left {
+    height: calc(
+        100vh - var(--forge-en-pane-offset-px, 320px) +
+            var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-column-controls-height, 2.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
+    min-height: calc(
+        24rem + var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-column-controls-height, 2.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
+    max-height: calc(
+        100vh - var(--forge-en-pane-offset-px, 320px) +
+            var(--forge-en-tab-nav-height, 2.7rem) +
+            var(--forge-en-column-controls-height, 2.25rem) +
+            var(--forge-en-left-height-adjust, 1.5rem)
+    );
 }
 
 .forge-en-split.forge-en-multi-column > .tab-nav.forge-en-original-tab-nav-hidden {
@@ -177,7 +250,7 @@
 }
 
 .forge-en-column-nav {
-    min-height: 2.7rem;
+    min-height: var(--forge-en-tab-nav-height, 2.7rem);
     flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
@@ -187,7 +260,7 @@
 
 .forge-en-column-controls {
     flex-shrink: 0;
-    min-height: 2.25rem;
+    min-height: var(--forge-en-column-controls-height, 2.25rem);
 }
 
 .forge-en-column-body {
@@ -289,6 +362,10 @@
     #img2img_extra_tabs > .tabs.forge-en-split .forge-en-left {
         grid-column: 1;
         grid-row: 1;
+        height: calc(100vh - var(--forge-en-pane-offset-px, 320px));
+        min-height: 24rem;
+        max-height: calc(100vh - var(--forge-en-pane-offset-px, 320px));
+        overflow-y: auto;
     }
 
     #txt2img_extra_tabs.forge-en-split > .tab-nav,
