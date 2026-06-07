@@ -818,3 +818,22 @@
     flex: 0 0 auto;
     min-width: 4.5rem;
 }
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--newline,
+#img2img_en_prompt_pane .forge-en-prompt-tag--newline {
+    background-color: rgba(128, 128, 128, 0.22);
+    border-color: rgba(128, 128, 128, 0.45);
+    color: var(--body-text-color-subdued, #aaa);
+    font-family: monospace;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--newline:hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--newline:hover {
+    background-color: rgba(128, 128, 128, 0.35);
+    border-color: rgba(128, 128, 128, 0.6);
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--newline,
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--newline {
+    background-color: rgba(128, 128, 128, 0.28);
+}

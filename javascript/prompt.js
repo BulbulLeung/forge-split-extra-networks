@@ -9,6 +9,9 @@ const FORGE_EN_PROMPT_SEPARATOR = ", ";
 const FORGE_EN_PROMPT_TAG_CLASS = "forge-en-prompt-tag";
 const FORGE_EN_PROMPT_TAG_CLASS_WILDCARD = "forge-en-prompt-tag--wildcard";
 const FORGE_EN_PROMPT_TAG_CLASS_LORA = "forge-en-prompt-tag--lora";
+const FORGE_EN_PROMPT_NEWLINE_MARKER = "\u0001";
+const FORGE_EN_PROMPT_NEWLINE_LABEL = "\\n";
+const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
 const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+>$/i;
 const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+\)$/i;
@@ -79,20 +82,52 @@ function forgeEnPromptEnsureTagsContainer(tabname) {
     return container;
 }
 
+function forgeEnPromptRemoveLegacyToolbar(tabname) {
+    const app = gradioApp();
+    if (!app) return;
+
+    const cards = app.querySelector("#" + forgeEnPromptTabnameFull(tabname) + "_cards");
+    if (!cards) return;
+
+    cards.querySelectorAll(".forge-en-prompt-toolbar").forEach(function (el) {
+        el.remove();
+    });
+}
+
+function forgeEnPromptIsNewlinePart(part) {
+    return part === FORGE_EN_PROMPT_NEWLINE_MARKER;
+}
+
 function forgeEnPromptSplitParts(text) {
     if (!text) return [];
-    return text
-        .split(",")
-        .map(function (part) {
-            return part.trim();
-        })
-        .filter(function (part) {
-            return part.length > 0;
+    const parts = [];
+    text.split("\n").forEach(function (line, lineIndex) {
+        if (lineIndex > 0) {
+            parts.push(FORGE_EN_PROMPT_NEWLINE_MARKER);
+        }
+        line.split(",").forEach(function (part) {
+            const trimmed = part.trim();
+            if (trimmed.length > 0) {
+                parts.push(trimmed);
+            }
         });
+    });
+    return parts;
 }
 
 function forgeEnPromptJoinParts(parts) {
-    return parts.join(FORGE_EN_PROMPT_SEPARATOR);
+    const lines = [];
+    let current = [];
+    parts.forEach(function (part) {
+        if (forgeEnPromptIsNewlinePart(part)) {
+            lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR));
+            current = [];
+        } else {
+            current.push(part);
+        }
+    });
+    lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR));
+    return lines.join("\n");
 }
 
 function forgeEnPromptGetWildcardWrap() {
@@ -125,6 +160,9 @@ function forgeEnPromptIsLoraPart(part) {
 }
 
 function forgeEnPromptTagTypeClass(part) {
+    if (forgeEnPromptIsNewlinePart(part)) {
+        return FORGE_EN_PROMPT_TAG_CLASS_NEWLINE;
+    }
     if (forgeEnPromptIsLoraPart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_LORA;
     }
@@ -154,12 +192,27 @@ function forgeEnPromptApplyTextarea(tabname, textarea, text) {
     forgeEnPromptSyncTags(tabname);
 }
 
+function forgeEnPromptInsertNewlineAfter(tabname, index) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const insertAt = Math.min(Math.max(0, index + 1), parts.length);
+    parts.splice(insertAt, 0, FORGE_EN_PROMPT_NEWLINE_MARKER);
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
 function forgeEnPromptInsertAfter(tabname, index, newText) {
     const textarea = forgeEnPromptGetTextarea(tabname);
     if (!textarea) return;
 
     const trimmed = (newText || "").trim();
     if (!trimmed) return;
+
+    if (trimmed === "\\n") {
+        forgeEnPromptInsertNewlineAfter(tabname, index);
+        return;
+    }
 
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     const insertAt = Math.min(Math.max(0, index + 1), parts.length);
@@ -457,8 +510,13 @@ function forgeEnPromptSyncTags(tabname) {
             FORGE_EN_PROMPT_TAG_CLASS +
             (typeClass ? " " + typeClass : "");
         button.dataset.index = String(index);
-        button.title = part;
-        button.textContent = part;
+        if (forgeEnPromptIsNewlinePart(part)) {
+            button.title = "Line break";
+            button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
+        } else {
+            button.title = part;
+            button.textContent = part;
+        }
         fragment.appendChild(button);
     });
 
@@ -743,6 +801,7 @@ function forgeEnPromptInstallTabSelectHook() {
 
 function forgeEnPromptInit() {
     forgeEnPromptBindPromptListeners();
+    FORGE_EN_PROMPT_TABNAMES.forEach(forgeEnPromptRemoveLegacyToolbar);
     forgeEnPromptBindTagsContainers();
     forgeEnPromptInstallTabSelectHook();
     forgeEnPromptInstallControlsHook();
