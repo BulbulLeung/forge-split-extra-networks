@@ -19,6 +19,8 @@ const FORGE_EN_PROMPT_DRAG_THRESHOLD_PX = 6;
 const FORGE_EN_PROMPT_TAG_CLASS_DRAGGING = "forge-en-prompt-tag--dragging";
 const FORGE_EN_PROMPT_DROP_LINE_CLASS = "forge-en-prompt-drop-line";
 const FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING = "forge-en-prompt-tags--dragging";
+const FORGE_EN_PROMPT_HISTORY_LIMIT = 16;
+const FORGE_EN_PROMPT_HISTORY_DELAY_MS = 600;
 
 const forgeEnPromptBound = {
     prompt: Object.create(null),
@@ -31,6 +33,190 @@ let forgeEnPromptInsertPopoverState = null;
 let forgeEnPromptAfterUiUpdatePending = null;
 let forgeEnPromptDragState = null;
 let forgeEnPromptDragSuppressClick = false;
+const forgeEnPromptHistoryByTextarea = new WeakMap();
+const forgeEnPromptHistoryEditTimers = new WeakMap();
+
+function forgeEnPromptHistoryEnabled() {
+    return true;
+}
+
+function forgeEnPromptGetHistoryState(textarea) {
+    let state = forgeEnPromptHistoryByTextarea.get(textarea);
+    if (!state) {
+        state = { undoStack: [], redoStack: [] };
+        forgeEnPromptHistoryByTextarea.set(textarea, state);
+    }
+    return state;
+}
+
+function forgeEnPromptHistorySnapshot(textarea, reset) {
+    if (!forgeEnPromptHistoryEnabled() || !textarea) return;
+    if (reset === undefined) {
+        reset = true;
+    }
+
+    const state = forgeEnPromptGetHistoryState(textarea);
+    const current = textarea.value;
+    if (current === state.undoStack.at(-1)) return;
+
+    state.undoStack.push(current);
+    if (state.undoStack.length > FORGE_EN_PROMPT_HISTORY_LIMIT) {
+        state.undoStack.shift();
+    }
+    if (reset) {
+        state.redoStack.length = 0;
+    }
+}
+
+function forgeEnPromptHistoryEnsureInitial(textarea) {
+    if (!forgeEnPromptHistoryEnabled() || !textarea) return;
+    const state = forgeEnPromptGetHistoryState(textarea);
+    if (state.undoStack.length === 0) {
+        forgeEnPromptHistorySnapshot(textarea);
+    }
+}
+
+function forgeEnPromptHistoryApplyValue(tabname, textarea, value) {
+    textarea.value = value;
+    if (typeof updateInput === "function") {
+        updateInput(textarea);
+    }
+    if (
+        tabname === "txt2img" &&
+        typeof recalculate_prompts_txt2img === "function"
+    ) {
+        recalculate_prompts_txt2img();
+    } else if (
+        tabname === "img2img" &&
+        typeof recalculate_prompts_img2img === "function"
+    ) {
+        recalculate_prompts_img2img();
+    }
+    forgeEnPromptSyncTags(tabname);
+}
+
+function forgeEnPromptHistoryUndo(tabname, textarea) {
+    if (!forgeEnPromptHistoryEnabled() || !textarea) return;
+
+    const state = forgeEnPromptGetHistoryState(textarea);
+    forgeEnPromptHistorySnapshot(textarea, false);
+
+    if (state.undoStack.length < 2) {
+        return;
+    }
+
+    const current = state.undoStack.pop();
+    state.redoStack.push(current);
+    forgeEnPromptHistoryApplyValue(tabname, textarea, state.undoStack.at(-1));
+}
+
+function forgeEnPromptHistoryRedo(tabname, textarea) {
+    if (!forgeEnPromptHistoryEnabled() || !textarea) return;
+
+    const state = forgeEnPromptGetHistoryState(textarea);
+    if (state.redoStack.length < 1) return;
+
+    state.undoStack.push(textarea.value);
+    forgeEnPromptHistoryApplyValue(
+        tabname,
+        textarea,
+        state.redoStack.pop(),
+    );
+}
+
+function forgeEnPromptHistoryScheduleSnapshot(textarea) {
+    const prev = forgeEnPromptHistoryEditTimers.get(textarea);
+    if (prev) clearTimeout(prev);
+    forgeEnPromptHistoryEditTimers.set(
+        textarea,
+        setTimeout(function () {
+            forgeEnPromptHistoryEditTimers.delete(textarea);
+            forgeEnPromptHistorySnapshot(textarea);
+        }, FORGE_EN_PROMPT_HISTORY_DELAY_MS),
+    );
+}
+
+function forgeEnPromptHistoryHandleKeydown(event, tabname) {
+    if (!(event.ctrlKey || event.metaKey)) return false;
+
+    if (!forgeEnPromptHistoryEnabled()) {
+        return false;
+    }
+
+    if (
+        event.target &&
+        event.target.closest &&
+        event.target.closest(".forge-en-prompt-insert-popover")
+    ) {
+        return false;
+    }
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return false;
+    }
+
+    const prev = forgeEnPromptHistoryEditTimers.get(textarea);
+    if (prev) clearTimeout(prev);
+
+    if (event.key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        forgeEnPromptHistoryUndo(tabname, textarea);
+        return true;
+    }
+    if (event.key === "Z" && event.shiftKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        forgeEnPromptHistoryRedo(tabname, textarea);
+        return true;
+    }
+    return false;
+}
+
+function forgeEnPromptIsPromptTabActive(tabname) {
+    const app = gradioApp();
+    if (!app) return false;
+
+    const tabBtn = app.querySelector("#" + tabname + "_en_prompt");
+    if (tabBtn && tabBtn.classList.contains("selected")) {
+        return true;
+    }
+
+    const columns = app.querySelectorAll(
+        "#" + tabname + "_extra_tabs .forge-en-column",
+    );
+    for (let i = 0; i < columns.length; i++) {
+        if (columns[i].dataset.forgeEnActiveSlug === FORGE_EN_PROMPT_PAGE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function forgeEnPromptInstallGlobalUndoKeydown() {
+    if (forgeEnPromptInstallGlobalUndoKeydown._installed) {
+        return;
+    }
+    forgeEnPromptInstallGlobalUndoKeydown._installed = true;
+
+    document.addEventListener(
+        "keydown",
+        function (event) {
+            if (!(event.ctrlKey || event.metaKey)) return;
+            if (event.key !== "z" && event.key !== "Z") return;
+
+            for (let i = 0; i < FORGE_EN_PROMPT_TABNAMES.length; i++) {
+                const tabname = FORGE_EN_PROMPT_TABNAMES[i];
+                if (!forgeEnPromptIsPromptTabActive(tabname)) continue;
+                if (forgeEnPromptHistoryHandleKeydown(event, tabname)) {
+                    break;
+                }
+            }
+        },
+        true,
+    );
+}
 
 function forgeEnPromptTabnameFull(tabname) {
     return tabname + "_" + FORGE_EN_PROMPT_PAGE;
@@ -56,9 +242,17 @@ function forgeEnPromptGetTagsContainer(tabname) {
     return app.querySelector("#" + tabname + "_en_prompt_tags");
 }
 
+function forgeEnPromptPrepareTagsContainer(container) {
+    if (!container) return;
+    if (!container.hasAttribute("tabindex")) {
+        container.setAttribute("tabindex", "-1");
+    }
+}
+
 function forgeEnPromptEnsureTagsContainer(tabname) {
     let container = forgeEnPromptGetTagsContainer(tabname);
     if (container) {
+        forgeEnPromptPrepareTagsContainer(container);
         return container;
     }
 
@@ -72,6 +266,7 @@ function forgeEnPromptEnsureTagsContainer(tabname) {
     container.className = "forge-en-prompt-tags extra-network-dirs";
     container.id = tabname + "_en_prompt_tags";
     container.dataset.tabname = tabname;
+    forgeEnPromptPrepareTagsContainer(container);
     cards.appendChild(container);
 
     if (forgeEnPromptBound.tags[tabname] !== container) {
@@ -177,7 +372,8 @@ function forgeEnPromptTagTypeClass(part) {
 }
 
 function forgeEnPromptApplyTextarea(tabname, textarea, text) {
-    if (!textarea) return;
+    if (!textarea || textarea.value === text) return;
+    forgeEnPromptHistorySnapshot(textarea);
     textarea.value = text;
     if (typeof updateInput === "function") {
         updateInput(textarea);
@@ -545,9 +741,17 @@ function forgeEnPromptBindTextarea(tabname, id, boundKey) {
     }
 
     forgeEnPromptBound[boundKey][tabname] = textarea;
+    forgeEnPromptHistoryEnsureInitial(textarea);
     textarea.addEventListener("input", function () {
         forgeEnPromptOnPromptActivity(tabname);
     });
+    textarea.addEventListener("keydown", function (event) {
+        if (forgeEnPromptHistoryHandleKeydown(event, tabname)) {
+            return;
+        }
+        if (["Control", "Meta", "Shift", "Alt"].includes(event.key)) return;
+        forgeEnPromptHistoryScheduleSnapshot(textarea);
+    }, true);
     textarea.addEventListener("focus", function () {
         if (typeof activePromptTextarea !== "undefined") {
             activePromptTextarea[tabname] = textarea;
@@ -574,9 +778,13 @@ function forgeEnPromptBindTagsContainers() {
         }
 
         forgeEnPromptBound.tags[tabname] = container;
+        forgeEnPromptPrepareTagsContainer(container);
 
         container.addEventListener("pointerdown", function (event) {
             if (event.button !== 0) return;
+            if (event.target === container) {
+                container.focus();
+            }
             const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
             if (!button || !container.contains(button)) return;
 
@@ -694,6 +902,10 @@ function forgeEnPromptBindTagsContainers() {
 
             forgeEnPromptRemoveAt(tabname, index);
         });
+
+        container.addEventListener("keydown", function (event) {
+            forgeEnPromptHistoryHandleKeydown(event, tabname);
+        });
     });
 }
 
@@ -804,6 +1016,7 @@ function forgeEnPromptInstallTabSelectHook() {
 }
 
 function forgeEnPromptInit() {
+    forgeEnPromptInstallGlobalUndoKeydown();
     forgeEnPromptBindPromptListeners();
     FORGE_EN_PROMPT_TABNAMES.forEach(forgeEnPromptRemoveLegacyToolbar);
     forgeEnPromptBindTagsContainers();
