@@ -17,10 +17,12 @@ _EXT_JS_FILES = (
     "enabled_filter.js",
     "wildcard.js",
     "lora.js",
+    "prompt.js",
 )
 
 _FORGE_EN_TAB_CHOICES = [
     "output_browser",
+    "prompt",
     "wildcard",
     "lora",
     "checkpoints",
@@ -90,6 +92,10 @@ shared.options_templates.update(
                 True,
                 "Show Wildcard tab in Extra Networks",
             ).needs_reload_ui(),
+            "forge_en_prompt_tab_enabled": shared.OptionInfo(
+                True,
+                "Show Prompt tab in Extra Networks",
+            ).needs_reload_ui(),
             "forge_en_lora_weight_button_size": shared.OptionInfo(
                 "Medium",
                 "Lora weight button size",
@@ -97,7 +103,7 @@ shared.options_templates.update(
                 {"choices": ("Small", "Medium", "Big")},
             ),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
-                "output browser,wildcard,lora,checkpoints,textual inversion",
+                "output browser,prompt,wildcard,lora,checkpoints,textual inversion",
                 "Extra Networks tab order (comma-separated page names)",
             ).needs_reload_ui(),
             "forge_en_split_default_extra_tab": shared.OptionInfo(
@@ -119,7 +125,7 @@ shared.options_templates.update(
                 {"minimum": 280, "maximum": 2000, "step": 10},
             ),
             "forge_en_column_1_tabs": shared.OptionInfo(
-                "output browser,wildcard,lora,checkpoints,textual inversion",
+                "output browser,prompt,wildcard,lora,checkpoints,textual inversion",
                 "Column 1: Extra Network tabs (comma-separated slugs)",
             ).needs_reload_ui(),
             "forge_en_column_2_tabs": shared.OptionInfo(
@@ -200,11 +206,20 @@ def _register_wildcard():
     ui_extra_networks.register_page(ExtraNetworksPageWildcard())
 
 
+def _register_prompt():
+    if not shared.opts.forge_en_prompt_tab_enabled:
+        return
+    from ui_extra_networks_prompt import ExtraNetworksPagePrompt
+
+    ui_extra_networks.register_page(ExtraNetworksPagePrompt())
+
+
 def _on_before_ui():
     _ensure_js_in_javascript_html()
     _apply_extra_networks_tab_order()
     _register_output_browser()
     _register_wildcard()
+    _register_prompt()
 
 
 script_callbacks.on_before_ui(
@@ -214,7 +229,7 @@ script_callbacks.on_before_ui(
 
 
 class SplitExtraNetworksLayout(scripts.Script):
-    """Registers settings, Output Browser and Wildcard EN pages; layout via javascript."""
+    """Registers settings, Output Browser, Prompt, Wildcard EN pages; layout via javascript."""
 
     def title(self):
         return "Split Extra Networks layout"
