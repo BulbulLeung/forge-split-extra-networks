@@ -1,5 +1,11 @@
 /* forge-split-extra-networks: Generation left, Extra Networks right */
 
+#settings [id^="setting_forge_en_spacer_"].settings-div {
+    padding: 1.25em 0 0.5em;
+    margin: 0;
+    border: none;
+}
+
 :root {
     --forge-en-tab-nav-height: 2.7rem;
     --forge-en-column-controls-height: 2.25rem;
@@ -894,6 +900,52 @@
 .forge-en-prompt-insert-popover .forge-en-prompt-insert-actions button {
     flex: 0 0 auto;
     min-width: 4.5rem;
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-status {
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: var(--body-text-color-subdued, #aaa);
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-status--error {
+    color: #e74c3c;
+}
+
+.forge-en-prompt-tag-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 1005;
+    max-width: min(90vw, 28rem);
+    padding: 0.5rem 0.65rem;
+    border-radius: 6px;
+    background: var(--body-background-fill, #2b2b2b);
+    border: 1px solid var(--border-color-primary, #555);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: var(--body-text-color, #eee);
+    pointer-events: none;
+    word-break: break-word;
+}
+
+.forge-en-prompt-tag-tooltip__original {
+    white-space: pre-wrap;
+}
+
+.forge-en-prompt-tag-tooltip__divider {
+    height: 1px;
+    margin: 0.4rem 0;
+    background: var(--border-color-primary, #555);
+}
+
+.forge-en-prompt-tag-tooltip__translation {
+    color: var(--body-text-color-subdued, #bbb);
+    white-space: pre-wrap;
+}
+
+.forge-en-prompt-tag-tooltip__error {
+    color: #e74c3c !important;
 }
 
 #txt2img_en_prompt_pane .forge-en-prompt-tag--newline,

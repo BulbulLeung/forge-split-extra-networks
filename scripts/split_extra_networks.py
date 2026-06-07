@@ -3,6 +3,7 @@ import os
 import sys
 
 from modules import errors, script_callbacks, scripts, shared, ui_extra_networks
+from modules.options import OptionDiv
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,10 +45,33 @@ def _forge_en_tab_dropdown():
     return {"choices": list(_FORGE_EN_TAB_CHOICES)}
 
 
+_FORGE_EN_LOCAL_AI_TRANSLATE_LANGS = (
+    "English",
+    "繁體中文",
+    "简体中文",
+    "日本語",
+    "한국어",
+    "Français",
+    "Deutsch",
+    "Español",
+    "Português",
+    "Русский",
+)
+
+
+def _forge_en_local_ai_translate_lang_dropdown():
+    return {"choices": list(_FORGE_EN_LOCAL_AI_TRANSLATE_LANGS)}
+
+
+def _forge_en_settings_spacer():
+    return OptionDiv()
+
+
 shared.options_templates.update(
     shared.options_section(
         ("forge_en_split", "Split Extra Networks layout", "ui"),
         {
+            # --- Split layout ---
             "forge_en_split_enabled": shared.OptionInfo(
                 True,
                 "Enable split layout (Generation left, Extra Networks right)",
@@ -68,6 +92,8 @@ shared.options_templates.update(
                 gr.Slider,
                 {"minimum": 80, "maximum": 600, "step": 8},
             ),
+            # --- Output Browser ---
+            "forge_en_spacer_output_browser": _forge_en_settings_spacer(),
             "forge_en_output_browser_enabled": shared.OptionInfo(
                 True,
                 "Show Output Browser tab in Extra Networks",
@@ -88,20 +114,54 @@ shared.options_templates.update(
                 True,
                 "Output Browser: auto-refresh after txt2img/img2img generation completes",
             ),
+            # --- Wildcard ---
+            "forge_en_spacer_wildcard": _forge_en_settings_spacer(),
             "forge_en_wildcard_enabled": shared.OptionInfo(
                 True,
                 "Show Wildcard tab in Extra Networks",
             ).needs_reload_ui(),
+            # --- Prompt / Local AI ---
+            "forge_en_spacer_prompt": _forge_en_settings_spacer(),
             "forge_en_prompt_tab_enabled": shared.OptionInfo(
                 True,
                 "Show Prompt tab in Extra Networks",
             ).needs_reload_ui(),
+            "forge_en_local_ai_enabled": shared.OptionInfo(
+                False,
+                "Enable Local AI auto prompt (tooltip translation and smart insert)",
+            ),
+            "forge_en_local_ai_translate_lang": shared.OptionInfo(
+                "繁體中文",
+                "Local AI: tooltip translation language",
+                gr.Dropdown,
+                _forge_en_local_ai_translate_lang_dropdown,
+            ),
+            "forge_en_local_ai_backend": shared.OptionInfo(
+                "Ollama",
+                "Local AI: backend",
+                gr.Radio,
+                {"choices": ("Ollama", "LM Studio")},
+            ),
+            "forge_en_local_ai_base_url": shared.OptionInfo(
+                "http://127.0.0.1:11434/v1",
+                "Local AI: API base URL",
+                gr.Textbox,
+            ).info("Ollama default: http://127.0.0.1:11434/v1 — LM Studio: http://127.0.0.1:1234/v1"),
+            "forge_en_local_ai_model": shared.OptionInfo(
+                "",
+                "Local AI: model name",
+                gr.Textbox,
+            ).info("e.g. llama3, qwen2.5 — must match the model loaded in Ollama or LM Studio"),
+            # --- LoRA ---
+            "forge_en_spacer_lora": _forge_en_settings_spacer(),
             "forge_en_lora_weight_button_size": shared.OptionInfo(
                 "Medium",
                 "Lora weight button size",
                 gr.Radio,
                 {"choices": ("Small", "Medium", "Big")},
             ),
+            # --- Tab order ---
+            "forge_en_spacer_tabs": _forge_en_settings_spacer(),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
                 "output browser,prompt,wildcard,lora,checkpoints,textual inversion",
                 "Extra Networks tab order (comma-separated page names)",
@@ -112,6 +172,8 @@ shared.options_templates.update(
                 gr.Dropdown,
                 _forge_en_tab_dropdown,
             ).needs_reload_ui(),
+            # --- Multi-column layout ---
+            "forge_en_spacer_columns": _forge_en_settings_spacer(),
             "forge_en_column_count": shared.OptionInfo(
                 1,
                 "Extra Networks horizontal columns (1–3)",
@@ -251,5 +313,13 @@ try:
 except Exception:
     errors.report(
         "forge-split-extra-networks: wildcard_api load failed",
+        exc_info=True,
+    )
+
+try:
+    import local_ai_api  # noqa: F401 — registers on_app_started routes
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: local_ai_api load failed",
         exc_info=True,
     )

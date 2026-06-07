@@ -21,6 +21,8 @@ const FORGE_EN_PROMPT_DROP_LINE_CLASS = "forge-en-prompt-drop-line";
 const FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING = "forge-en-prompt-tags--dragging";
 const FORGE_EN_PROMPT_HISTORY_LIMIT = 16;
 const FORGE_EN_PROMPT_HISTORY_DELAY_MS = 600;
+const FORGE_EN_LOCAL_AI_CONNECT_ERROR = "Local AI connect error";
+const FORGE_EN_PROMPT_TOOLTIP_DEBOUNCE_MS = 150;
 
 const forgeEnPromptBound = {
     prompt: Object.create(null),
@@ -30,6 +32,12 @@ const forgeEnPromptBound = {
 
 let forgeEnPromptInsertPopoverEl = null;
 let forgeEnPromptInsertPopoverState = null;
+let forgeEnPromptTagTooltipEl = null;
+let forgeEnPromptTagTooltipHoverTimer = null;
+let forgeEnPromptTagTooltipAnchor = null;
+let forgeEnPromptTagTooltipActiveKey = null;
+const forgeEnPromptTagTooltipCache = new Map();
+const forgeEnPromptTagTooltipInflight = new Map();
 let forgeEnPromptAfterUiUpdatePending = null;
 let forgeEnPromptDragState = null;
 let forgeEnPromptDragSuppressClick = false;
@@ -358,6 +366,13 @@ function forgeEnPromptIsLoraPart(part) {
     );
 }
 
+function forgeEnPromptTagTooltipNeedsTranslation(partText) {
+    return (
+        !forgeEnPromptIsLoraPart(partText) &&
+        !forgeEnPromptIsWildcardPart(partText)
+    );
+}
+
 function forgeEnPromptTagTypeClass(part) {
     if (forgeEnPromptIsNewlinePart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_NEWLINE;
@@ -587,9 +602,412 @@ function forgeEnPromptFinishDrag(event, container) {
     forgeEnPromptResetDragState(container);
 }
 
+function forgeEnPromptLocalAiEnabled() {
+    return (
+        typeof opts !== "undefined" && opts.forge_en_local_ai_enabled === true
+    );
+}
+
+function forgeEnPromptGetTranslateLang() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.forge_en_local_ai_translate_lang
+    ) {
+        return String(opts.forge_en_local_ai_translate_lang);
+    }
+    return "繁體中文";
+}
+
+function forgeEnPromptGetTagTooltipCacheKey(partText) {
+    return partText + "\0" + forgeEnPromptGetTranslateLang();
+}
+
+function forgeEnPromptAnchorMatchesCacheKey(button, cacheKey) {
+    if (!button) return false;
+    return forgeEnPromptGetTagTooltipCacheKey(
+        button.dataset.promptText || button.textContent || "",
+    ) === cacheKey;
+}
+
+function forgeEnPromptApplyTagTooltipEntry(
+    tooltip,
+    button,
+    cacheKey,
+    entry,
+) {
+    if (
+        !forgeEnPromptTagTooltipAnchor ||
+        !forgeEnPromptAnchorMatchesCacheKey(
+            forgeEnPromptTagTooltipAnchor,
+            cacheKey,
+        )
+    ) {
+        return;
+    }
+
+    const translationEl = tooltip.querySelector(
+        ".forge-en-prompt-tag-tooltip__translation",
+    );
+    if (!translationEl) return;
+
+    if (entry.error) {
+        translationEl.textContent = entry.error;
+        translationEl.classList.add("forge-en-prompt-tag-tooltip__error");
+    } else {
+        translationEl.textContent = entry.translation;
+        translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+    }
+    forgeEnPromptPositionTagTooltip(tooltip, forgeEnPromptTagTooltipAnchor);
+}
+
+function forgeEnPromptFetchTagTooltipTranslation(cacheKey, partText) {
+    const cached = forgeEnPromptTagTooltipCache.get(cacheKey);
+    if (cached) {
+        return Promise.resolve(cached);
+    }
+
+    const inflight = forgeEnPromptTagTooltipInflight.get(cacheKey);
+    if (inflight) {
+        return inflight;
+    }
+
+    const promise = fetch("/forge-en-local-ai/translate-tooltip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: partText }),
+    })
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (data) {
+            const entry = data.error
+                ? { translation: "", error: data.error }
+                : { translation: data.translation || "", error: null };
+            forgeEnPromptTagTooltipCache.set(cacheKey, entry);
+            return entry;
+        })
+        .catch(function () {
+            const entry = {
+                translation: "",
+                error: FORGE_EN_LOCAL_AI_CONNECT_ERROR,
+            };
+            forgeEnPromptTagTooltipCache.set(cacheKey, entry);
+            return entry;
+        })
+        .finally(function () {
+            forgeEnPromptTagTooltipInflight.delete(cacheKey);
+        });
+
+    forgeEnPromptTagTooltipInflight.set(cacheKey, promise);
+    return promise;
+}
+
+function forgeEnPromptHideTagTooltip() {
+    if (forgeEnPromptTagTooltipHoverTimer !== null) {
+        clearTimeout(forgeEnPromptTagTooltipHoverTimer);
+        forgeEnPromptTagTooltipHoverTimer = null;
+    }
+    if (forgeEnPromptTagTooltipEl) {
+        forgeEnPromptTagTooltipEl.style.display = "none";
+    }
+    forgeEnPromptTagTooltipAnchor = null;
+    forgeEnPromptTagTooltipActiveKey = null;
+}
+
+function forgeEnPromptEnsureTagTooltip() {
+    if (forgeEnPromptTagTooltipEl) {
+        return forgeEnPromptTagTooltipEl;
+    }
+
+    const app = gradioApp();
+    if (!app) return null;
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "forge-en-prompt-tag-tooltip";
+    tooltip.style.display = "none";
+    tooltip.innerHTML =
+        '<div class="forge-en-prompt-tag-tooltip__original"></div>' +
+        '<div class="forge-en-prompt-tag-tooltip__divider"></div>' +
+        '<div class="forge-en-prompt-tag-tooltip__translation"></div>';
+
+    app.appendChild(tooltip);
+    forgeEnPromptTagTooltipEl = tooltip;
+    return tooltip;
+}
+
+function forgeEnPromptPositionTagTooltip(tooltip, anchor) {
+    const rect = anchor.getBoundingClientRect();
+    const margin = 8;
+    let left = rect.left;
+    let top = rect.bottom + margin;
+
+    tooltip.style.display = "block";
+    tooltip.style.visibility = "hidden";
+
+    const tipRect = tooltip.getBoundingClientRect();
+    const maxLeft = window.innerWidth - tipRect.width - margin;
+    const maxTop = window.innerHeight - tipRect.height - margin;
+
+    left = Math.max(margin, Math.min(left, maxLeft));
+    top = Math.max(margin, Math.min(top, maxTop));
+
+    tooltip.style.left = left + "px";
+    tooltip.style.top = top + "px";
+    tooltip.style.visibility = "visible";
+}
+
+function forgeEnPromptShowTagTooltip(button, partText, isNewline) {
+    const tooltip = forgeEnPromptEnsureTagTooltip();
+    if (!tooltip) return;
+
+    forgeEnPromptTagTooltipAnchor = button;
+
+    const originalEl = tooltip.querySelector(
+        ".forge-en-prompt-tag-tooltip__original",
+    );
+    const dividerEl = tooltip.querySelector(
+        ".forge-en-prompt-tag-tooltip__divider",
+    );
+    const translationEl = tooltip.querySelector(
+        ".forge-en-prompt-tag-tooltip__translation",
+    );
+
+    if (isNewline) {
+        originalEl.textContent = "Line break";
+        dividerEl.style.display = "none";
+        translationEl.textContent = "";
+        translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+        forgeEnPromptPositionTagTooltip(tooltip, button);
+        return;
+    }
+
+    originalEl.textContent = partText;
+
+    if (!forgeEnPromptLocalAiEnabled()) {
+        dividerEl.style.display = "none";
+        translationEl.textContent = "";
+        translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+        forgeEnPromptPositionTagTooltip(tooltip, button);
+        return;
+    }
+
+    if (!forgeEnPromptTagTooltipNeedsTranslation(partText)) {
+        dividerEl.style.display = "none";
+        translationEl.textContent = "";
+        translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+        forgeEnPromptPositionTagTooltip(tooltip, button);
+        return;
+    }
+
+    const cacheKey = forgeEnPromptGetTagTooltipCacheKey(partText);
+    forgeEnPromptTagTooltipActiveKey = cacheKey;
+    const cached = forgeEnPromptTagTooltipCache.get(cacheKey);
+    dividerEl.style.display = "block";
+
+    if (cached) {
+        if (cached.error) {
+            translationEl.textContent = cached.error;
+            translationEl.classList.add("forge-en-prompt-tag-tooltip__error");
+        } else {
+            translationEl.textContent = cached.translation;
+            translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+        }
+        forgeEnPromptPositionTagTooltip(tooltip, button);
+        return;
+    }
+
+    translationEl.textContent = "...";
+    translationEl.classList.remove("forge-en-prompt-tag-tooltip__error");
+    forgeEnPromptPositionTagTooltip(tooltip, button);
+
+    forgeEnPromptFetchTagTooltipTranslation(cacheKey, partText).then(
+        function (entry) {
+            forgeEnPromptApplyTagTooltipEntry(
+                tooltip,
+                button,
+                cacheKey,
+                entry,
+            );
+        },
+    );
+}
+
+function forgeEnPromptOnTagMouseEnter(button) {
+    const partText = button.dataset.promptText || button.textContent || "";
+    const cacheKey = forgeEnPromptGetTagTooltipCacheKey(partText);
+    if (
+        forgeEnPromptTagTooltipAnchor === button &&
+        forgeEnPromptTagTooltipActiveKey === cacheKey &&
+        forgeEnPromptTagTooltipEl &&
+        forgeEnPromptTagTooltipEl.style.display !== "none"
+    ) {
+        return;
+    }
+
+    if (forgeEnPromptTagTooltipHoverTimer !== null) {
+        clearTimeout(forgeEnPromptTagTooltipHoverTimer);
+    }
+    forgeEnPromptTagTooltipHoverTimer = setTimeout(function () {
+        forgeEnPromptTagTooltipHoverTimer = null;
+        const isNewline = button.classList.contains(
+            FORGE_EN_PROMPT_TAG_CLASS_NEWLINE,
+        );
+        const partText = button.dataset.promptText || button.textContent || "";
+        forgeEnPromptShowTagTooltip(button, partText, isNewline);
+    }, FORGE_EN_PROMPT_TOOLTIP_DEBOUNCE_MS);
+}
+
+function forgeEnPromptOnTagMouseLeave(button) {
+    if (forgeEnPromptTagTooltipHoverTimer !== null) {
+        clearTimeout(forgeEnPromptTagTooltipHoverTimer);
+        forgeEnPromptTagTooltipHoverTimer = null;
+    }
+    if (forgeEnPromptTagTooltipAnchor === button) {
+        forgeEnPromptHideTagTooltip();
+    }
+}
+
+function forgeEnPromptBindTagTooltip(container) {
+    if (container._forgeEnTooltipBound) return;
+    container._forgeEnTooltipBound = true;
+
+    container.addEventListener("mouseover", function (event) {
+        const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+        if (!button || !container.contains(button)) return;
+        const related = event.relatedTarget;
+        if (related && button.contains(related)) return;
+        forgeEnPromptOnTagMouseEnter(button);
+    });
+
+    container.addEventListener("mouseout", function (event) {
+        const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+        if (!button || !container.contains(button)) return;
+        const related = event.relatedTarget;
+        if (related && button.contains(related)) return;
+        forgeEnPromptOnTagMouseLeave(button);
+    });
+}
+
+function forgeEnPromptSetInsertStatus(message, isError) {
+    if (!forgeEnPromptInsertPopoverEl) return;
+    const status = forgeEnPromptInsertPopoverEl.querySelector(
+        ".forge-en-prompt-insert-status",
+    );
+    if (!status) return;
+    status.textContent = message || "";
+    status.classList.toggle("forge-en-prompt-insert-status--error", !!isError);
+    status.style.display = message ? "block" : "none";
+}
+
+function forgeEnPromptSetInsertLoading(loading) {
+    if (!forgeEnPromptInsertPopoverEl) return;
+    const input = forgeEnPromptInsertPopoverEl.querySelector(
+        ".forge-en-prompt-insert-input",
+    );
+    const confirmBtn = forgeEnPromptInsertPopoverEl.querySelector(
+        ".forge-en-prompt-insert-confirm",
+    );
+    const cancelBtn = forgeEnPromptInsertPopoverEl.querySelector(
+        ".forge-en-prompt-insert-cancel",
+    );
+    if (input) input.disabled = loading;
+    if (confirmBtn) {
+        confirmBtn.disabled = loading;
+        confirmBtn.textContent = loading ? "Processing..." : "Insert";
+    }
+    if (cancelBtn) cancelBtn.disabled = loading;
+}
+
+function forgeEnPromptInsertMultipleAfter(tabname, index, texts) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const toInsert = (texts || [])
+        .map(function (t) {
+            return (t || "").trim();
+        })
+        .filter(function (t) {
+            return t.length > 0;
+        });
+    if (toInsert.length === 0) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const insertAt = Math.min(Math.max(0, index + 1), parts.length);
+    parts.splice(insertAt, 0, ...toInsert);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+    );
+}
+
+function forgeEnPromptInsertNeedsLlm(rawText) {
+    const trimmed = (rawText || "").trim();
+    if (!trimmed || trimmed === "\\n") {
+        return false;
+    }
+    if (trimmed.startsWith("#")) {
+        return true;
+    }
+    return /[\u0400-\u04FF\u0600-\u06FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\uAC00-\uD7AF]/.test(
+        trimmed,
+    );
+}
+
+async function forgeEnPromptProcessInsert(tabname, index, rawText) {
+    const trimmed = (rawText || "").trim();
+    if (!trimmed) return { ok: false };
+
+    if (!forgeEnPromptLocalAiEnabled()) {
+        if (trimmed === "\\n") {
+            forgeEnPromptInsertNewlineAfter(tabname, index);
+        } else {
+            forgeEnPromptInsertAfter(tabname, index, trimmed);
+        }
+        return { ok: true };
+    }
+
+    if (trimmed === "\\n") {
+        forgeEnPromptInsertNewlineAfter(tabname, index);
+        return { ok: true };
+    }
+
+    if (!forgeEnPromptInsertNeedsLlm(trimmed)) {
+        forgeEnPromptInsertAfter(tabname, index, trimmed);
+        return { ok: true };
+    }
+
+    const response = await fetch("/forge-en-local-ai/process-insert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
+    });
+    const data = await response.json();
+
+    if (data.error) {
+        return { ok: false, error: data.error };
+    }
+
+    if (data.parts && Array.isArray(data.parts)) {
+        if (data.parts.length > 0) {
+            forgeEnPromptInsertMultipleAfter(tabname, index, data.parts);
+        }
+        return { ok: true };
+    }
+
+    const text = (data.text || "").trim();
+    if (!text) {
+        return { ok: false, error: FORGE_EN_LOCAL_AI_CONNECT_ERROR };
+    }
+    forgeEnPromptInsertAfter(tabname, index, text);
+    return { ok: true };
+}
+
 function forgeEnPromptHideInsertPopover() {
     if (forgeEnPromptInsertPopoverEl) {
         forgeEnPromptInsertPopoverEl.style.display = "none";
+        forgeEnPromptSetInsertLoading(false);
+        forgeEnPromptSetInsertStatus("", false);
     }
     forgeEnPromptInsertPopoverState = null;
 }
@@ -607,6 +1025,7 @@ function forgeEnPromptEnsureInsertPopover() {
     popover.style.display = "none";
     popover.innerHTML =
         '<input type="text" class="forge-en-prompt-insert-input" autocomplete="off" spellcheck="false" />' +
+        '<div class="forge-en-prompt-insert-status" style="display:none"></div>' +
         '<div class="forge-en-prompt-insert-actions">' +
         '<button type="button" class="forge-en-prompt-insert-confirm lg primary gradio-button custom-button">Insert</button>' +
         '<button type="button" class="forge-en-prompt-insert-cancel lg secondary gradio-button custom-button">Cancel</button>' +
@@ -616,13 +1035,37 @@ function forgeEnPromptEnsureInsertPopover() {
     const confirmBtn = popover.querySelector(".forge-en-prompt-insert-confirm");
     const cancelBtn = popover.querySelector(".forge-en-prompt-insert-cancel");
 
-    confirmBtn.addEventListener("click", function (event) {
+    confirmBtn.addEventListener("click", async function (event) {
         event.preventDefault();
         event.stopPropagation();
         if (!forgeEnPromptInsertPopoverState) return;
         const state = forgeEnPromptInsertPopoverState;
-        forgeEnPromptInsertAfter(state.tabname, state.index, input.value);
-        forgeEnPromptHideInsertPopover();
+
+        forgeEnPromptSetInsertStatus("", false);
+        forgeEnPromptSetInsertLoading(true);
+
+        try {
+            const result = await forgeEnPromptProcessInsert(
+                state.tabname,
+                state.index,
+                input.value,
+            );
+            if (!result.ok) {
+                forgeEnPromptSetInsertStatus(
+                    result.error || FORGE_EN_LOCAL_AI_CONNECT_ERROR,
+                    true,
+                );
+                forgeEnPromptSetInsertLoading(false);
+                return;
+            }
+            forgeEnPromptHideInsertPopover();
+        } catch (_err) {
+            forgeEnPromptSetInsertStatus(
+                FORGE_EN_LOCAL_AI_CONNECT_ERROR,
+                true,
+            );
+            forgeEnPromptSetInsertLoading(false);
+        }
     });
 
     cancelBtn.addEventListener("click", function (event) {
@@ -689,6 +1132,9 @@ function forgeEnPromptShowInsertPopover(button, tabname, index) {
 
     const input = popover.querySelector(".forge-en-prompt-insert-input");
     input.value = "";
+    input.disabled = false;
+    forgeEnPromptSetInsertStatus("", false);
+    forgeEnPromptSetInsertLoading(false);
     forgeEnPromptPositionInsertPopover(popover, button);
     input.focus();
 }
@@ -711,10 +1157,9 @@ function forgeEnPromptSyncTags(tabname) {
             (typeClass ? " " + typeClass : "");
         button.dataset.index = String(index);
         if (forgeEnPromptIsNewlinePart(part)) {
-            button.title = "Line break";
             button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
         } else {
-            button.title = part;
+            button.dataset.promptText = part;
             button.textContent = part;
         }
         fragment.appendChild(button);
@@ -779,6 +1224,7 @@ function forgeEnPromptBindTagsContainers() {
 
         forgeEnPromptBound.tags[tabname] = container;
         forgeEnPromptPrepareTagsContainer(container);
+        forgeEnPromptBindTagTooltip(container);
 
         container.addEventListener("pointerdown", function (event) {
             if (event.button !== 0) return;
