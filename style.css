@@ -355,6 +355,80 @@
     cursor: pointer;
 }
 
+/* Lora: prompt-active highlight (same outline setting as Wildcard) */
+#txt2img_lora_cards .card.forge-en-lora-active,
+#img2img_lora_cards .card.forge-en-lora-active {
+    outline: var(--forge-en-output-selection-outline-width, 5px) solid
+        var(--color-accent, #4a9eff);
+    outline-offset: -2px;
+    box-shadow: 0 0 12px rgba(74, 158, 255, 0.45);
+}
+
+#txt2img_lora_cards .card,
+#img2img_lora_cards .card {
+    position: relative;
+}
+
+.forge-en-lora-weight-overlay {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.25em 0.45em;
+    border-radius: 0.35em;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-size: clamp(
+        8px,
+        calc(var(--forge-en-lora-card-width, 120px) * 0.085),
+        16px
+    );
+    line-height: 1;
+    pointer-events: auto;
+    user-select: none;
+    max-width: calc(var(--forge-en-lora-card-width, 120px) * 0.92);
+}
+
+#txt2img_lora_cards .card.forge-en-lora-active .forge-en-lora-weight-overlay,
+#img2img_lora_cards .card.forge-en-lora-active .forge-en-lora-weight-overlay {
+    display: flex;
+}
+
+.forge-en-lora-weight-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 0.25em;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.forge-en-lora-weight-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.forge-en-lora-weight-value {
+    flex: 1 1 auto;
+    min-width: 2.2em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 1em;
+}
+
 /* Output Browser: single-click selection highlight */
 #txt2img_output_browser_cards .card.forge-en-output-selected,
 #img2img_output_browser_cards .card.forge-en-output-selected {
