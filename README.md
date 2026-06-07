@@ -2,7 +2,7 @@
 
 Designed for Stable Diffusion WebUI Forge - Neo.
 
-Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkpoints, LoRA, Textual Inversion, Wildcard, Output Browser**, and other Extra Networks on the right—reducing tab switching and making model selection faster. Includes built-in **Output Browser** and **Wildcard** tabs, with optional **1–3 column** horizontal layout; each column has its own tab bar, search bar, and width.
+Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkpoints, LoRA, Textual Inversion, Wildcard, Prompt, Output Browser**, and other Extra Networks on the right—reducing tab switching and making model selection faster. Includes built-in **Prompt**, **Output Browser**, and **Wildcard** tabs, **LoRA card highlight & weight controls**, and optional **1–3 column** horizontal layout; each column has its own tab bar, search bar, and width.
 
 
 
@@ -17,8 +17,10 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 | Item | Description |
 |------|-------------|
 | Generation always on the left | Sampling, dimensions, seed, scripts, and gallery stay visible |
-| Extra Networks on the right | Checkpoints, LoRA, Textual Inversion, Wildcard, Output Browser, and other tabs grouped on the right |
+| Extra Networks on the right | Checkpoints, LoRA, Textual Inversion, Wildcard, Prompt, Output Browser, and other tabs grouped on the right |
 | Multi-column layout (1–3 columns) | Up to **3 horizontal columns** on the right; each column can show selected EN tabs, with independent Search/Sort and resizable width |
+| Prompt tab | Visual tag view of the left-side prompt; drag to reorder, double-click to insert, right-click to remove; LoRA / wildcard tags are color-coded |
+| LoRA highlight & weight | Cards for LoRAs already in the prompt show an **orange border** and **− / weight / +** overlay; adjust strength in **0.1** steps without editing text |
 | Output Browser | Browse images in the output directory; thumbnail grid with path labels; **single-click** multi-select, **double-click** full-size preview, **right-click** send params / delete |
 | Wildcard | Browse wildcard files; **single-click** toggles `__name__` tokens in the prompt; **right-click** opens a line picker to append a single line from a file to the prompt |
 | Remember width | Optionally save right-panel / per-column width to browser `localStorage` |
@@ -62,19 +64,21 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 | Extra Networks preview pane: viewport offset (px) | Vertical padding of the right-panel thumbnail preview relative to the viewport (px); larger values make the panel shorter | 320 |
 | Show Output Browser tab in Extra Networks | Whether to show the Output Browser tab | Enabled |
 | Show Wildcard tab in Extra Networks | Whether to show the Wildcard tab | Enabled |
+| Show Prompt tab in Extra Networks | Whether to show the Prompt tab | Enabled |
+| Lora weight button size | Size of the **− / weight / +** overlay on highlighted LoRA cards | Medium |
 | Output Browser: maximum number of images to list | Maximum images in the list (newest by modification time) | 500 |
 | Output Browser: selection outline width (px) | Highlight border width when a thumbnail is selected with a single click | 5 |
 | Output Browser: auto-refresh after txt2img/img2img generation completes | Automatically rescan the Output Browser list after generation completes | Enabled |
-| Extra Networks tab order | Tab order on the right (comma-separated) | output browser,wildcard,lora,checkpoints,textual inversion |
+| Extra Networks tab order | Tab order on the right (comma-separated) | output browser,prompt,wildcard,lora,checkpoints,textual inversion |
 | Default Extra Networks tab on startup | Default tab on startup in **single-column mode** | output_browser |
 | **Extra Networks horizontal columns (1–3)** | Number of horizontal columns on the right; `1` is traditional single-column | 1 |
 | Default width per column (px, multi-column mode) | Default width per column in **multi-column mode** | 520 |
 | Column 1/2/3: Extra Network tabs | Tabs to show in that column (comma-separated slugs; see below) | Column 1: all; columns 2 and 3: empty by default |
 | Column 1/2/3: default tab on startup | Default tab on startup for that column | Column 1: output_browser; column 2: lora; column 3: checkpoints |
 
-**Tab slugs (for Column tabs settings)**: `output_browser`, `wildcard`, `lora`, `checkpoints`, `textual_inversion` (display names such as `output browser` also work and are normalized automatically).
+**Tab slugs (for Column tabs settings)**: `output_browser`, `prompt`, `wildcard`, `lora`, `checkpoints`, `textual_inversion` (display names such as `output browser` also work and are normalized automatically).
 
-After changing enable state, Output Browser, Wildcard, column count, or tab configuration, **Reload UI** is recommended. Changes to preview pane viewport offset (px) usually take effect immediately; if not, try **Reload UI**.
+After changing enable state, Output Browser, Wildcard, Prompt tab, column count, or tab configuration, **Reload UI** is recommended. Changes to preview pane viewport offset (px) usually take effect immediately; if not, try **Reload UI**.
 
 ### Multi-column layout (Column 1–3)
 
@@ -94,6 +98,49 @@ When **Extra Networks horizontal columns** is set to **2** or **3**:
 | horizontal columns | 2 |
 | Column 1 tabs | `output browser,wildcard` |
 | Column 2 tabs | `lora,checkpoints` |
+
+### Prompt tab
+
+Mirrors the **left-side prompt textarea** as a row of tag buttons in Extra Networks, so you can inspect and edit long prompts without scrolling the text box.
+
+![Prompt tab: tag buttons with LoRA and wildcard highlights](prompt-tab.png)
+
+*Preview: **Prompt** tab splits the prompt by commas and line breaks into tags. **LoRA** tokens (`<lora:name:weight>`) use a blue fill with an orange border; **wildcard** tokens (`__path/name__`) use a brown fill with an orange border; `\n` marks a line break.*
+
+#### UI
+
+- **Location**: txt2img / img2img → right-side Extra Networks → **Prompt** tab.
+- **Tag layout**: One button per comma-separated segment; each newline in the prompt inserts a `\n` tag between rows.
+- **Color coding**: LoRA and wildcard tokens use distinct styles (same colors as in the screenshot above); ordinary prompt text uses the default button style.
+- **Two-way sync**: Editing the left prompt textarea updates tags immediately; tag actions write back to the textarea (including token recalculation hooks).
+
+#### Actions
+
+- **Drag** a tag: reorder segments (drop indicator shows insert position).
+- **Double-click** a tag: open an **Insert** popover to add text **after** that tag (type `\n` to insert a line break).
+- **Right-click** a tag: **remove** that segment from the prompt.
+- **Ctrl+Z** / **Ctrl+Shift+Z** (or **Cmd** on macOS): undo / redo prompt edits while the Prompt tab is active (local history, up to 16 steps).
+
+### LoRA highlight & weight adjustment
+
+When a LoRA appears in the prompt (`<lora:name:weight>`), its card in the **LoRA** tab is highlighted and shows inline weight controls—no need to edit the prompt string by hand.
+
+![LoRA tab: highlighted cards with weight − / value / + overlay](lora-weight.png)
+
+*Preview: LoRAs present in the prompt get an **orange selection border**. The overlay shows the current weight; **−** and **+** change it in **0.1** steps and update `<lora:name:weight>` in the prompt.*
+
+#### UI
+
+- **Location**: txt2img / img2img → right-side Extra Networks → **LoRA** tab.
+- **Highlight**: Cards matching a LoRA token in the active prompt receive class `forge-en-lora-active` (orange outline).
+- **Weight overlay**: On highlighted cards only—**−**, current weight, **+** (step **0.1**; button size: **Settings → Lora weight button size**).
+
+#### Actions
+
+- **− / +**: Decrease or increase that LoRA’s weight in the prompt; overlay and prompt text stay in sync.
+- **Click** a highlighted card (outside the overlay): **remove** that LoRA from the prompt (including its activation text suffix, same as the default Extra Networks remove behavior).
+- **Add** a LoRA via the normal card click (when not highlighted): unchanged WebUI behavior; the card becomes highlighted and shows the overlay once the token is in the prompt.
+- **Edit the prompt** on the left: highlights and displayed weights update automatically.
 
 ### Wildcard
 
@@ -140,15 +187,20 @@ Browses wildcard files from [sd-dynamic-prompts](https://github.com/adieyal/sd-d
 ```
 forge-split-extra-networks/
 ├── README.md
-├── preview.png              # Preview screenshot
+├── preview.png              # Multi-column layout preview
+├── prompt-tab.png           # Prompt tab screenshot
+├── lora-weight.png          # LoRA highlight & weight overlay screenshot
 ├── metadata.ini
-├── style.css                # Split / multi-column grid styles
+├── style.css                # Split / multi-column / prompt & LoRA styles
 ├── ui_extra_networks_output_browser.py
+├── ui_extra_networks_prompt.py
 ├── ui_extra_networks_wildcard.py
 ├── javascript/
 │   ├── split_extra_networks.js
 │   ├── output_browser.js
-│   └── wildcard.js
+│   ├── wildcard.js
+│   ├── lora.js              # LoRA highlight & weight overlay
+│   └── prompt.js            # Prompt tab tags
 └── scripts/
     ├── split_extra_networks.py   # Settings and EN tab registration
     ├── output_browser_api.py     # Output Browser infotext / delete API
