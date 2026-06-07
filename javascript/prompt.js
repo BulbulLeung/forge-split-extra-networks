@@ -120,7 +120,11 @@ function forgeEnPromptJoinParts(parts) {
     let current = [];
     parts.forEach(function (part) {
         if (forgeEnPromptIsNewlinePart(part)) {
-            lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR));
+            if (current.length > 0) {
+                lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR) + ",");
+            } else {
+                lines.push("");
+            }
             current = [];
         } else {
             current.push(part);
