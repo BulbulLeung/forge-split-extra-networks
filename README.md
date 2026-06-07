@@ -19,7 +19,7 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 | Generation always on the left | Sampling, dimensions, seed, scripts, and gallery stay visible |
 | Extra Networks on the right | Checkpoints, LoRA, Textual Inversion, Wildcard, Prompt, Output Browser, and other tabs grouped on the right |
 | Multi-column layout (1–3 columns) | Up to **3 horizontal columns** on the right; each column can show selected EN tabs, with independent Search/Sort and resizable width |
-| Prompt tab | Visual tag view of the left-side prompt; drag to reorder, double-click to insert, right-click to remove; LoRA / wildcard tags are color-coded |
+| Prompt tab | Visual tag view of the left-side prompt; drag to reorder, double-click to edit, trailing **+** to insert, right-click to remove; LoRA / wildcard tags are color-coded |
 | LoRA highlight & weight | Cards for LoRAs already in the prompt show an **orange border** and **− / weight / +** overlay; adjust strength in **0.1** steps without editing text |
 | Output Browser | Browse images in the output directory; thumbnail grid with path labels; **single-click** multi-select, **double-click** full-size preview, **right-click** send params / delete |
 | Wildcard | Browse wildcard files; **single-click** toggles `__name__` tokens in the prompt; **right-click** opens a line picker to append a single line from a file to the prompt |
@@ -117,7 +117,8 @@ Mirrors the **left-side prompt textarea** as a row of tag buttons in Extra Netwo
 #### Actions
 
 - **Drag** a tag: reorder segments (drop indicator shows insert position).
-- **Double-click** a tag: open an **Insert** popover to add text **after** that tag (type `\n` to insert a line break).
+- **Double-click** a tag: open an **Edit** popover to change that segment's text (type `\n` to keep or insert a line break).
+- **Click** the trailing **+** button: open an **Insert** popover to add text after the last tag (supports Local AI translation / `#` prompt generation when enabled).
 - **Right-click** a tag: **remove** that segment from the prompt.
 - **Ctrl+Z** / **Ctrl+Shift+Z** (or **Cmd** on macOS): undo / redo prompt edits while the Prompt tab is active (local history, up to 16 steps).
 

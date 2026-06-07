@@ -7,6 +7,7 @@ const FORGE_EN_PROMPT_TABNAMES = ["txt2img", "img2img"];
 const FORGE_EN_PROMPT_PAGE = "en_prompt";
 const FORGE_EN_PROMPT_SEPARATOR = ", ";
 const FORGE_EN_PROMPT_TAG_CLASS = "forge-en-prompt-tag";
+const FORGE_EN_PROMPT_ADD_CLASS = "forge-en-prompt-add";
 const FORGE_EN_PROMPT_TAG_CLASS_WILDCARD = "forge-en-prompt-tag--wildcard";
 const FORGE_EN_PROMPT_TAG_CLASS_LORA = "forge-en-prompt-tag--lora";
 const FORGE_EN_PROMPT_NEWLINE_MARKER = "\u0001";
@@ -100,7 +101,7 @@ function forgeEnPromptHistoryApplyValue(tabname, textarea, value) {
     ) {
         recalculate_prompts_img2img();
     }
-    forgeEnPromptSyncTags(tabname);
+    forgeEnPromptSyncTags(tabname, true);
 }
 
 function forgeEnPromptHistoryUndo(tabname, textarea) {
@@ -404,7 +405,7 @@ function forgeEnPromptApplyTextarea(tabname, textarea, text) {
     ) {
         recalculate_prompts_img2img();
     }
-    forgeEnPromptSyncTags(tabname);
+    forgeEnPromptSyncTags(tabname, true);
 }
 
 function forgeEnPromptInsertNewlineAfter(tabname, index) {
@@ -443,6 +444,24 @@ function forgeEnPromptRemoveAt(tabname, index) {
     if (index < 0 || index >= parts.length) return;
 
     parts.splice(index, 1);
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptUpdateAt(tabname, index, newText) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (index < 0 || index >= parts.length) return;
+
+    const trimmed = (newText || "").trim();
+    if (!trimmed) {
+        parts.splice(index, 1);
+    } else if (trimmed === "\\n") {
+        parts[index] = FORGE_EN_PROMPT_NEWLINE_MARKER;
+    } else {
+        parts[index] = trimmed;
+    }
     forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
 }
 
@@ -714,6 +733,14 @@ function forgeEnPromptHideTagTooltip() {
     forgeEnPromptTagTooltipActiveKey = null;
 }
 
+function forgeEnPromptIsInsertPopoverOpen() {
+    return !!(
+        forgeEnPromptInsertPopoverState &&
+        forgeEnPromptInsertPopoverEl &&
+        forgeEnPromptInsertPopoverEl.style.display !== "none"
+    );
+}
+
 function forgeEnPromptEnsureTagTooltip() {
     if (forgeEnPromptTagTooltipEl) {
         return forgeEnPromptTagTooltipEl;
@@ -757,6 +784,8 @@ function forgeEnPromptPositionTagTooltip(tooltip, anchor) {
 }
 
 function forgeEnPromptShowTagTooltip(button, partText, isNewline) {
+    if (forgeEnPromptIsInsertPopoverOpen()) return;
+
     const tooltip = forgeEnPromptEnsureTagTooltip();
     if (!tooltip) return;
 
@@ -833,6 +862,8 @@ function forgeEnPromptShowTagTooltip(button, partText, isNewline) {
 }
 
 function forgeEnPromptOnTagMouseEnter(button) {
+    if (forgeEnPromptIsInsertPopoverOpen()) return;
+
     const partText = button.dataset.promptText || button.textContent || "";
     const cacheKey = forgeEnPromptGetTagTooltipCacheKey(partText);
     if (
@@ -849,6 +880,7 @@ function forgeEnPromptOnTagMouseEnter(button) {
     }
     forgeEnPromptTagTooltipHoverTimer = setTimeout(function () {
         forgeEnPromptTagTooltipHoverTimer = null;
+        if (forgeEnPromptIsInsertPopoverOpen()) return;
         const isNewline = button.classList.contains(
             FORGE_EN_PROMPT_TAG_CLASS_NEWLINE,
         );
@@ -913,7 +945,9 @@ function forgeEnPromptSetInsertLoading(loading) {
     if (input) input.disabled = loading;
     if (confirmBtn) {
         confirmBtn.disabled = loading;
-        confirmBtn.textContent = loading ? "Processing..." : "Insert";
+        const mode = forgeEnPromptInsertPopoverState?.mode || "insert";
+        const idleLabel = mode === "edit" ? "Save" : "Insert";
+        confirmBtn.textContent = loading ? "Processing..." : idleLabel;
     }
     if (cancelBtn) cancelBtn.disabled = loading;
 }
@@ -1042,6 +1076,13 @@ function forgeEnPromptEnsureInsertPopover() {
         const state = forgeEnPromptInsertPopoverState;
 
         forgeEnPromptSetInsertStatus("", false);
+
+        if (state.mode === "edit") {
+            forgeEnPromptUpdateAt(state.tabname, state.index, input.value);
+            forgeEnPromptHideInsertPopover();
+            return;
+        }
+
         forgeEnPromptSetInsertLoading(true);
 
         try {
@@ -1124,25 +1165,50 @@ function forgeEnPromptPositionInsertPopover(popover, anchor) {
     popover.style.visibility = "visible";
 }
 
-function forgeEnPromptShowInsertPopover(button, tabname, index) {
+function forgeEnPromptShowPopover(anchor, tabname, index, mode, initialText) {
+    forgeEnPromptHideTagTooltip();
+
     const popover = forgeEnPromptEnsureInsertPopover();
     if (!popover) return;
 
-    forgeEnPromptInsertPopoverState = { tabname: tabname, index: index };
+    const popoverMode = mode === "edit" ? "edit" : "insert";
+    forgeEnPromptInsertPopoverState = {
+        tabname: tabname,
+        index: index,
+        mode: popoverMode,
+    };
 
     const input = popover.querySelector(".forge-en-prompt-insert-input");
-    input.value = "";
+    const confirmBtn = popover.querySelector(".forge-en-prompt-insert-confirm");
+    input.value = initialText || "";
     input.disabled = false;
+    if (confirmBtn) {
+        confirmBtn.textContent = popoverMode === "edit" ? "Save" : "Insert";
+        confirmBtn.disabled = false;
+    }
     forgeEnPromptSetInsertStatus("", false);
     forgeEnPromptSetInsertLoading(false);
-    forgeEnPromptPositionInsertPopover(popover, button);
+    forgeEnPromptPositionInsertPopover(popover, anchor);
     input.focus();
+    if (popoverMode === "edit") {
+        input.select();
+    }
 }
 
-function forgeEnPromptSyncTags(tabname) {
+function forgeEnPromptSyncTags(tabname, forceSync) {
     const container = forgeEnPromptEnsureTagsContainer(tabname);
     const textarea = forgeEnPromptGetTextarea(tabname);
     if (!container) return;
+
+    const skipDuringDrag =
+        !forceSync &&
+        forgeEnPromptDragState &&
+        forgeEnPromptDragState.dragging &&
+        forgeEnPromptDragState.tabname === tabname;
+
+    if (skipDuringDrag) {
+        return;
+    }
 
     const parts = forgeEnPromptSplitParts(textarea ? textarea.value || "" : "");
     const fragment = document.createDocumentFragment();
@@ -1164,6 +1230,15 @@ function forgeEnPromptSyncTags(tabname) {
         }
         fragment.appendChild(button);
     });
+
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className =
+        "lg secondary gradio-button custom-button " + FORGE_EN_PROMPT_ADD_CLASS;
+    addButton.textContent = "+";
+    addButton.title = "Add prompt";
+    addButton.setAttribute("aria-label", "Add prompt");
+    fragment.appendChild(addButton);
 
     container.replaceChildren(fragment);
 }
@@ -1317,6 +1392,19 @@ function forgeEnPromptBindTagsContainers() {
         });
 
         container.addEventListener("click", function (event) {
+            const addBtn = event.target.closest("." + FORGE_EN_PROMPT_ADD_CLASS);
+            if (addBtn && container.contains(addBtn)) {
+                event.preventDefault();
+                event.stopPropagation();
+                const textarea = forgeEnPromptGetTextarea(tabname);
+                const parts = forgeEnPromptSplitParts(
+                    textarea ? textarea.value || "" : "",
+                );
+                const index = parts.length > 0 ? parts.length - 1 : -1;
+                forgeEnPromptShowPopover(addBtn, tabname, index, "insert", "");
+                return;
+            }
+
             if (!forgeEnPromptDragSuppressClick) return;
             event.preventDefault();
             event.stopPropagation();
@@ -1333,7 +1421,15 @@ function forgeEnPromptBindTagsContainers() {
             const index = parseInt(button.dataset.index, 10);
             if (Number.isNaN(index)) return;
 
-            forgeEnPromptShowInsertPopover(button, tabname, index);
+            const textarea = forgeEnPromptGetTextarea(tabname);
+            const parts = forgeEnPromptSplitParts(
+                textarea ? textarea.value || "" : "",
+            );
+            const part = parts[index];
+            const initialText = forgeEnPromptIsNewlinePart(part)
+                ? "\\n"
+                : part || "";
+            forgeEnPromptShowPopover(button, tabname, index, "edit", initialText);
         });
 
         container.addEventListener("contextmenu", function (event) {
