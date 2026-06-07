@@ -11,6 +11,7 @@ const FORGE_EN_LORA_PROMPT_RE = /<lora:([^:>]+):([\d.]+)>/g;
 const forgeEnLoraBound = {
     prompt: Object.create(null),
     cardIndex: Object.create(null),
+    cards: Object.create(null),
 };
 
 function forgeEnLoraGetPromptTextarea(tabname) {
@@ -50,6 +51,415 @@ function forgeEnLoraKeyFromCard(card) {
     }
 
     return card.getAttribute("data-name") || "";
+}
+
+function forgeEnLoraUnescapeJsString(text) {
+    return text.replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+}
+
+function forgeEnLoraDecodeJsonStringContent(text) {
+    try {
+        return JSON.parse(
+            '"' + text.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"',
+        );
+    } catch (_err) {
+        return text;
+    }
+}
+
+function forgeEnLoraActivationTextFromCard(card) {
+    if (card.dataset.forgeEnLoraActivationParsed === "1") {
+        return card.dataset.forgeEnLoraActivationText || "";
+    }
+
+    const onclick = card.getAttribute("onclick") || "";
+    let activationText = "";
+
+    const dqMatch = onclick.match(
+        /\+\s*">"\s*(?:\+\s*"((?:\\.|[^"\\])*)")?/,
+    );
+    if (dqMatch) {
+        if (dqMatch[1]) {
+            activationText = forgeEnLoraDecodeJsonStringContent(dqMatch[1]);
+        }
+    } else {
+        const sqMatch = onclick.match(
+            /\+\s*'>'\s*(?:\+\s*'((?:\\'|[^'\\])*)')?/,
+        );
+        if (sqMatch && sqMatch[1]) {
+            activationText = forgeEnLoraUnescapeJsString(sqMatch[1]);
+        }
+    }
+
+    card.dataset.forgeEnLoraActivationText = activationText;
+    card.dataset.forgeEnLoraActivationParsed = "1";
+
+    return activationText;
+}
+
+function forgeEnLoraActivationSuffixCandidates(activationText) {
+    if (!activationText) {
+        return [];
+    }
+    const raw = [
+        activationText,
+        activationText.trimStart(),
+        activationText.replace(/^[\s,]+/, ""),
+        activationText.trim(),
+    ];
+    const seen = Object.create(null);
+    const out = [];
+    raw.forEach(function (item) {
+        if (!item || seen[item]) {
+            return;
+        }
+        seen[item] = true;
+        out.push(item);
+    });
+    out.sort(function (a, b) {
+        return b.length - a.length;
+    });
+    return out;
+}
+
+function forgeEnLoraMatchActivationSuffix(afterToken, activationText) {
+    const candidates = forgeEnLoraActivationSuffixCandidates(activationText);
+    for (let i = 0; i < candidates.length; i++) {
+        const suffix = candidates[i];
+        if (afterToken.startsWith(suffix)) {
+            return suffix;
+        }
+        const leadSpace = afterToken.length - afterToken.trimStart().length;
+        const trimmedAfter = afterToken.trimStart();
+        const trimmedSuffix = suffix.trimStart();
+        if (trimmedSuffix && trimmedAfter.startsWith(trimmedSuffix)) {
+            let end = leadSpace + trimmedSuffix.length;
+            if (afterToken[end] === " ") {
+                end += 1;
+            }
+            return afterToken.slice(0, end);
+        }
+    }
+    return null;
+}
+
+function forgeEnLoraGetAddSeparator() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.extra_networks_add_text_separator != null
+    ) {
+        return String(opts.extra_networks_add_text_separator);
+    }
+    return " ";
+}
+
+function forgeEnLoraBuildTokenPattern(loraKey) {
+    const escaped = forgeEnLoraEscapeRegex(loraKey);
+    return "<lora:" + escaped + ":[\\d.]+>";
+}
+
+function forgeEnLoraPromptContainsLora(prompt, loraKey) {
+    return new RegExp(forgeEnLoraBuildTokenPattern(loraKey)).test(prompt || "");
+}
+
+function forgeEnLoraLineContainsLora(line, loraKey) {
+    return new RegExp(forgeEnLoraBuildTokenPattern(loraKey)).test(line || "");
+}
+
+function forgeEnLoraGetLineIndexForPos(text, pos) {
+    if (pos <= 0) {
+        return 0;
+    }
+    return text.slice(0, pos).split("\n").length - 1;
+}
+
+function forgeEnLoraRemoveFromLine(line, loraKey, activationText) {
+    if (!forgeEnLoraLineContainsLora(line, loraKey)) {
+        return {
+            line: line,
+            removedStart: -1,
+            removedEnd: -1,
+        };
+    }
+
+    const tokenPart = forgeEnLoraBuildTokenPattern(loraKey);
+    const sep = forgeEnLoraGetAddSeparator();
+    const patterns = [];
+    if (sep.length > 0) {
+        patterns.push(new RegExp(forgeEnLoraEscapeRegex(sep) + tokenPart));
+    }
+    patterns.push(new RegExp(tokenPart + "[ \\t]*,[ \\t]*"));
+    patterns.push(new RegExp(tokenPart));
+
+    let result = line;
+    let removedStart = -1;
+    let removedEnd = -1;
+
+    for (let i = 0; i < patterns.length; i++) {
+        const match = patterns[i].exec(line);
+        if (match) {
+            removedStart = match.index;
+            removedEnd = match.index + match[0].length;
+            const afterToken = line.slice(removedEnd);
+            const matchedSuffix = forgeEnLoraMatchActivationSuffix(
+                afterToken,
+                activationText,
+            );
+            if (matchedSuffix) {
+                removedEnd += matchedSuffix.length;
+            }
+            result = line.slice(0, removedStart) + line.slice(removedEnd);
+            break;
+        }
+    }
+
+    result = result.replace(/[ \t]{2,}/g, " ").trimEnd();
+    if (result.length > 0 && !result.endsWith(",")) {
+        result += ",";
+    }
+
+    return {
+        line: result,
+        removedStart: removedStart,
+        removedEnd: removedEnd,
+    };
+}
+
+function forgeEnLoraMapCaretInLine(
+    oldLine,
+    newLine,
+    posInLine,
+    removedStart,
+    removedEnd,
+) {
+    if (removedStart < 0) {
+        return Math.min(Math.max(0, posInLine), newLine.length);
+    }
+
+    if (posInLine >= oldLine.length) {
+        return newLine.length;
+    }
+
+    let pos = posInLine;
+    if (pos <= removedStart) {
+        pos = posInLine;
+    } else if (pos >= removedEnd) {
+        pos -= removedEnd - removedStart;
+    } else {
+        pos = removedStart;
+    }
+
+    return Math.max(0, Math.min(pos, newLine.length));
+}
+
+function forgeEnLoraFindLoraLine(lines, loraKey, cursorLine) {
+    let fallbackLine = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!forgeEnLoraLineContainsLora(lines[i], loraKey)) {
+            continue;
+        }
+        if (i === cursorLine) {
+            return i;
+        }
+        if (fallbackLine < 0) {
+            fallbackLine = i;
+        }
+    }
+
+    return fallbackLine;
+}
+
+function forgeEnLoraMapSelectionAfterRemove(
+    lines,
+    processed,
+    selectionPos,
+    tokenLine,
+    cursorLine,
+) {
+    let oldPos = 0;
+    let newPos = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const oldLine = lines[i];
+        const entry = processed[i];
+        const newLine = entry.line;
+
+        if (i === tokenLine) {
+            const posInLine =
+                cursorLine === tokenLine
+                    ? selectionPos - oldPos
+                    : entry.removedStart >= 0
+                      ? entry.removedStart
+                      : 0;
+            return (
+                newPos +
+                forgeEnLoraMapCaretInLine(
+                    oldLine,
+                    newLine,
+                    posInLine,
+                    entry.removedStart,
+                    entry.removedEnd,
+                )
+            );
+        }
+
+        oldPos += oldLine.length + (i < lines.length - 1 ? 1 : 0);
+        newPos += newLine.length + (i < processed.length - 1 ? 1 : 0);
+    }
+
+    return newPos;
+}
+
+function forgeEnLoraRemoveLoraFromPromptWithCaret(
+    prompt,
+    loraKey,
+    selectionStart,
+    selectionEnd,
+    activationText,
+) {
+    if (!forgeEnLoraPromptContainsLora(prompt, loraKey)) {
+        return {
+            text: prompt,
+            caret: selectionStart,
+            caretEnd: selectionEnd,
+        };
+    }
+
+    const normalized = prompt.replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
+    const cursorLine = forgeEnLoraGetLineIndexForPos(
+        normalized,
+        selectionStart,
+    );
+    const tokenLine = forgeEnLoraFindLoraLine(lines, loraKey, cursorLine);
+    const suffix = activationText || "";
+
+    const processed = lines.map(function (line) {
+        return forgeEnLoraRemoveFromLine(line, loraKey, suffix);
+    });
+    const text = processed
+        .map(function (entry) {
+            return entry.line;
+        })
+        .join("\n");
+
+    let caret = forgeEnLoraMapSelectionAfterRemove(
+        lines,
+        processed,
+        selectionStart,
+        tokenLine,
+        cursorLine,
+    );
+    let caretEnd = forgeEnLoraMapSelectionAfterRemove(
+        lines,
+        processed,
+        selectionEnd,
+        tokenLine,
+        cursorLine,
+    );
+
+    caret = Math.max(0, Math.min(caret, text.length));
+    caretEnd = Math.max(0, Math.min(caretEnd, text.length));
+    if (caretEnd < caret) {
+        caretEnd = caret;
+    }
+
+    return {
+        text: text,
+        caret: caret,
+        caretEnd: caretEnd,
+    };
+}
+
+function forgeEnLoraRemoveWithCaret(tabname, loraKey, card) {
+    const textarea = forgeEnLoraGetPromptTextarea(tabname);
+    if (!textarea || !loraKey) return;
+
+    const current = textarea.value || "";
+    if (!forgeEnLoraPromptContainsLora(current, loraKey)) return;
+
+    const selStart =
+        typeof textarea.selectionStart === "number"
+            ? textarea.selectionStart
+            : current.length;
+    const selEnd =
+        typeof textarea.selectionEnd === "number"
+            ? textarea.selectionEnd
+            : selStart;
+    const activationText = card
+        ? forgeEnLoraActivationTextFromCard(card)
+        : "";
+
+    const result = forgeEnLoraRemoveLoraFromPromptWithCaret(
+        current,
+        loraKey,
+        selStart,
+        selEnd,
+        activationText,
+    );
+
+    textarea.value = result.text;
+    textarea.focus();
+    textarea.selectionStart = result.caret;
+    textarea.selectionEnd = result.caretEnd;
+
+    if (typeof updateInput === "function") {
+        updateInput(textarea);
+    }
+    if (
+        tabname === "txt2img" &&
+        typeof recalculate_prompts_txt2img === "function"
+    ) {
+        recalculate_prompts_txt2img();
+    } else if (
+        tabname === "img2img" &&
+        typeof recalculate_prompts_img2img === "function"
+    ) {
+        recalculate_prompts_img2img();
+    }
+}
+
+function forgeEnLoraCardClickCapture(event, tabname, container) {
+    if (event.target.closest(".button-row")) return;
+    if (event.target.closest(".forge-en-lora-weight-overlay")) return;
+
+    const card = event.target.closest(".card");
+    if (!card || !container.contains(card)) return;
+
+    const loraKey = forgeEnLoraKeyFromCard(card);
+    if (!loraKey) return;
+
+    const textarea = forgeEnLoraGetPromptTextarea(tabname);
+    const prompt = textarea ? textarea.value || "" : "";
+    if (!forgeEnLoraPromptContainsLora(prompt, loraKey)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    forgeEnLoraRemoveWithCaret(tabname, loraKey, card);
+    forgeEnLoraSyncHighlights(tabname);
+}
+
+function forgeEnLoraBindCardContainers() {
+    const app = gradioApp();
+    if (!app) return;
+
+    FORGE_EN_LORA_TABNAMES.forEach(function (tabname) {
+        const container = app.querySelector("#" + tabname + "_lora_cards");
+        if (!container || forgeEnLoraBound.cards[tabname] === container) {
+            return;
+        }
+
+        forgeEnLoraBound.cards[tabname] = container;
+        container.addEventListener(
+            "click",
+            function (event) {
+                forgeEnLoraCardClickCapture(event, tabname, container);
+            },
+            true,
+        );
+    });
 }
 
 function forgeEnLoraInvalidateCardIndex(tabname) {
@@ -296,11 +706,13 @@ function forgeEnLoraSetup() {
         forgeEnOutputBrowserApplySelectionStyle();
     }
     forgeEnLoraBindPromptListeners();
+    forgeEnLoraBindCardContainers();
 }
 
 function forgeEnLoraOnAfterUiUpdate() {
     FORGE_EN_LORA_TABNAMES.forEach(forgeEnLoraInvalidateCardIndex);
     forgeEnLoraBindPromptListeners();
+    forgeEnLoraBindCardContainers();
     forgeEnLoraSyncAllHighlights();
 }
 
