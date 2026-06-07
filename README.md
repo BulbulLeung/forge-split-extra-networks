@@ -19,7 +19,7 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 | Generation always on the left | Sampling, dimensions, seed, scripts, and gallery stay visible |
 | Extra Networks on the right | Checkpoints, LoRA, Textual Inversion, Wildcard, Prompt, Output Browser, and other tabs grouped on the right |
 | Multi-column layout (1–3 columns) | Up to **3 horizontal columns** on the right; each column can show selected EN tabs, with independent Search/Sort and resizable width |
-| Prompt tab | Visual tag view of the left-side prompt; drag to reorder, double-click to edit, trailing **+** to insert, right-click to remove; LoRA / wildcard tags are color-coded |
+| Prompt tab | Visual tag view of the left-side prompt; drag to reorder, double-click to edit, trailing **+** to insert, right-click to remove; LoRA / wildcard tags are color-coded; optional **Local AI** for hover translation and smart insert |
 | LoRA highlight & weight | Cards for LoRAs already in the prompt show an **orange border** and **− / weight / +** overlay; adjust strength in **0.1** steps without editing text |
 | Output Browser | Browse images in the output directory; thumbnail grid with path labels; **single-click** multi-select, **double-click** full-size preview, **right-click** send params / delete |
 | Wildcard | Browse wildcard files; **single-click** toggles `__name__` tokens in the prompt; **right-click** opens a line picker to append a single line from a file to the prompt |
@@ -76,6 +76,18 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 | Column 1/2/3: Extra Network tabs | Tabs to show in that column (comma-separated slugs; see below) | Column 1: all; columns 2 and 3: empty by default |
 | Column 1/2/3: default tab on startup | Default tab on startup for that column | Column 1: output_browser; column 2: lora; column 3: checkpoints |
 
+**Prompt / Local AI** (same Settings page, under the Prompt section)
+
+| Option | Description | Default |
+|------|------|------|
+| Enable Local AI auto prompt | Enable tooltip translation on tag hover and smart insert in the **+** popover | Disabled |
+| Local AI: tooltip translation language | Target language for hover translations (English, 繁體中文, 简体中文, 日本語, 한국어, Français, Deutsch, Español, Português, Русский) | 繁體中文 |
+| Local AI: backend | Local LLM backend | Ollama |
+| Local AI: API base URL | OpenAI-compatible chat completions endpoint | `http://127.0.0.1:11434/v1` |
+| Local AI: model name | Model name loaded in Ollama or LM Studio (e.g. `llama3`, `qwen2.5`) | (empty) |
+
+Ollama default URL: `http://127.0.0.1:11434/v1`. LM Studio example: `http://127.0.0.1:1234/v1`. Changes to backend, URL, or model usually take effect without **Reload UI**. If the local LLM is unreachable, the UI shows **Local AI connect error** in red.
+
 **Tab slugs (for Column tabs settings)**: `output_browser`, `prompt`, `wildcard`, `lora`, `checkpoints`, `textual_inversion` (display names such as `output browser` also work and are normalized automatically).
 
 After changing enable state, Output Browser, Wildcard, Prompt tab, column count, or tab configuration, **Reload UI** is recommended. Changes to preview pane viewport offset (px) usually take effect immediately; if not, try **Reload UI**.
@@ -116,11 +128,46 @@ Mirrors the **left-side prompt textarea** as a row of tag buttons in Extra Netwo
 
 #### Actions
 
+- **Mouse over** a tag: show a tooltip with the full tag text; when Local AI is enabled, a translation may appear below (see [Local AI](#local-ai-optional)).
 - **Drag** a tag: reorder segments (drop indicator shows insert position).
-- **Double-click** a tag: open an **Edit** popover to change that segment's text (type `\n` to keep or insert a line break).
-- **Click** the trailing **+** button: open an **Insert** popover to add text after the last tag (supports Local AI translation / `#` prompt generation when enabled).
+- **Double-click** a tag: open an **Edit** popover to change that segment's text (type `\n` to keep or insert a line break). **Enter** confirms; **Esc** cancels.
+- **Click** the trailing **+** button: open an **Insert** popover to add text after the last tag. **Enter** confirms; **Esc** cancels. Supports Local AI smart insert when enabled (see below).
 - **Right-click** a tag: **remove** that segment from the prompt.
 - **Ctrl+Z** / **Ctrl+Shift+Z** (or **Cmd** on macOS): undo / redo prompt edits while the Prompt tab is active (local history, up to 16 steps).
+
+#### Local AI (optional)
+
+Requires **Enable Local AI auto prompt** in Settings and a running Ollama or LM Studio instance with a compatible OpenAI API.
+
+**Tooltip translation (mouse over)**
+
+- Hover a tag to see its full text in the tooltip.
+- When Local AI is enabled and the tag needs translation, the tooltip shows a second line translated into **Local AI: tooltip translation language**.
+- LoRA tokens (`<lora:…>`) and wildcard tokens (`__name__`) are not translated.
+- On connection failure, the tooltip shows **Local AI connect error** in red.
+- The tooltip closes when you open an Edit/Insert popover or right-click to delete a tag.
+
+**Smart insert (trailing + button only)**
+
+Edit popover saves text directly and does **not** use Local AI. Only the **Insert** popover uses Local AI when enabled.
+
+When Local AI is enabled, the Insert popover shows inline help:
+
+- **Plain text**: English is inserted directly; non-English text is translated to English first, then inserted.
+- **`#` prefix**: Text after `#` is sent to Local AI to generate SD/SDXL-style prompt tags; multiple tags may be inserted at once.
+
+Example:
+
+| Input | Typical result |
+|------|----------------|
+| `# a girl in red dress by the window` | `1girl, red dress, window, indoors` |
+
+Actual generated tags depend on the loaded model. Type `\n` in the input to insert a line-break marker instead of a text tag.
+
+**Keyboard (Edit and Insert popovers)**
+
+- **Enter**: confirm (Save / Insert)
+- **Esc**: cancel and close
 
 ### LoRA highlight & weight adjustment
 
@@ -201,9 +248,10 @@ forge-split-extra-networks/
 │   ├── output_browser.js
 │   ├── wildcard.js
 │   ├── lora.js              # LoRA highlight & weight overlay
-│   └── prompt.js            # Prompt tab tags
+│   └── prompt.js            # Prompt tab tags + Local AI tooltip/insert
 └── scripts/
     ├── split_extra_networks.py   # Settings and EN tab registration
+    ├── local_ai_api.py           # Local AI FastAPI routes (tooltip / insert)
     ├── output_browser_api.py     # Output Browser infotext / delete API
     └── wildcard_api.py           # Wildcard line-list API
 ```
