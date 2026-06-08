@@ -24,6 +24,10 @@ const FORGE_EN_PROMPT_HISTORY_LIMIT = 16;
 const FORGE_EN_PROMPT_HISTORY_DELAY_MS = 600;
 const FORGE_EN_LOCAL_AI_CONNECT_ERROR = "Local AI connect error";
 const FORGE_EN_PROMPT_TOOLTIP_DEBOUNCE_MS = 150;
+const FORGE_EN_PROMPT_SELECTED_CLASS = "forge-en-output-selected";
+const FORGE_EN_PROMPT_SELECTION_OUTLINE_DEFAULT_PX = 5;
+const FORGE_EN_PROMPT_SELECTION_OUTLINE_MIN_PX = 1;
+const FORGE_EN_PROMPT_SELECTION_OUTLINE_MAX_PX = 12;
 
 const forgeEnPromptBound = {
     prompt: Object.create(null),
@@ -449,6 +453,240 @@ function forgeEnPromptRemoveAt(tabname, index) {
     forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
 }
 
+function forgeEnPromptSelectionOutlinePx() {
+    if (
+        typeof opts !== "undefined" &&
+        opts.forge_en_output_browser_selection_outline_px != null
+    ) {
+        const n = parseInt(opts.forge_en_output_browser_selection_outline_px, 10);
+        if (!Number.isNaN(n)) {
+            return Math.max(
+                FORGE_EN_PROMPT_SELECTION_OUTLINE_MIN_PX,
+                Math.min(FORGE_EN_PROMPT_SELECTION_OUTLINE_MAX_PX, n),
+            );
+        }
+    }
+    return FORGE_EN_PROMPT_SELECTION_OUTLINE_DEFAULT_PX;
+}
+
+function forgeEnPromptApplySelectionOutlineStyle() {
+    const root = gradioApp();
+    if (!root) return;
+    root.style.setProperty(
+        "--forge-en-output-selection-outline-width",
+        forgeEnPromptSelectionOutlinePx() + "px",
+    );
+}
+
+function forgeEnPromptGetTagButtons(container) {
+    return Array.from(
+        container.querySelectorAll("." + FORGE_EN_PROMPT_TAG_CLASS),
+    );
+}
+
+function forgeEnPromptClearSelection(container) {
+    container
+        .querySelectorAll("." + FORGE_EN_PROMPT_SELECTED_CLASS)
+        .forEach(function (button) {
+            button.classList.remove(FORGE_EN_PROMPT_SELECTED_CLASS);
+        });
+}
+
+function forgeEnPromptGetSelectedIndices(container) {
+    const indices = [];
+    forgeEnPromptGetTagButtons(container).forEach(function (button) {
+        if (!button.classList.contains(FORGE_EN_PROMPT_SELECTED_CLASS)) {
+            return;
+        }
+        const index = parseInt(button.dataset.index, 10);
+        if (!Number.isNaN(index)) {
+            indices.push(index);
+        }
+    });
+    return indices;
+}
+
+function forgeEnPromptSelectRange(container, buttons, fromIndex, toIndex) {
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+    for (let i = start; i <= end; i++) {
+        if (buttons[i]) {
+            buttons[i].classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+        }
+    }
+}
+
+function forgeEnPromptGetAnchorIndex(container, buttons, fallbackIndex) {
+    const raw = container.dataset.forgeEnAnchorIndex;
+    if (raw === undefined || raw === "") {
+        return fallbackIndex;
+    }
+    const anchor = parseInt(raw, 10);
+    if (Number.isNaN(anchor) || anchor < 0 || anchor >= buttons.length) {
+        return fallbackIndex;
+    }
+    return anchor;
+}
+
+function forgeEnPromptSetAnchor(container, index) {
+    container.dataset.forgeEnAnchorIndex = String(index);
+}
+
+function forgeEnPromptHandleTagClick(event, container, tabname) {
+    if (event.target.closest("." + FORGE_EN_PROMPT_ADD_CLASS)) {
+        return;
+    }
+
+    if (forgeEnPromptDragSuppressClick) {
+        return;
+    }
+
+    const button = event.target.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+    if (!button || !container.contains(button)) {
+        if (event.target === container) {
+            forgeEnPromptClearSelection(container);
+        }
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const buttons = forgeEnPromptGetTagButtons(container);
+    const index = buttons.indexOf(button);
+    if (index < 0) {
+        return;
+    }
+
+    container.focus();
+    const extend = event.ctrlKey || event.metaKey;
+
+    if (event.shiftKey) {
+        const anchor = forgeEnPromptGetAnchorIndex(container, buttons, index);
+        if (!extend) {
+            forgeEnPromptClearSelection(container);
+        }
+        forgeEnPromptSelectRange(container, buttons, anchor, index);
+        return;
+    }
+
+    if (extend) {
+        button.classList.toggle(FORGE_EN_PROMPT_SELECTED_CLASS);
+        forgeEnPromptSetAnchor(container, index);
+        return;
+    }
+
+    forgeEnPromptClearSelection(container);
+    button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+    forgeEnPromptSetAnchor(container, index);
+}
+
+function forgeEnPromptRemoveIndices(tabname, indices) {
+    if (!indices || indices.length === 0) return;
+
+    forgeEnPromptHideTagTooltip();
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const sorted = indices
+        .slice()
+        .filter(function (index) {
+            return index >= 0 && index < parts.length;
+        })
+        .sort(function (a, b) {
+            return b - a;
+        });
+
+    if (sorted.length === 0) return;
+
+    const unique = [];
+    const seen = new Set();
+    sorted.forEach(function (index) {
+        if (!seen.has(index)) {
+            seen.add(index);
+            unique.push(index);
+        }
+    });
+
+    unique.forEach(function (index) {
+        parts.splice(index, 1);
+    });
+
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    if (container) {
+        forgeEnPromptClearSelection(container);
+        delete container.dataset.forgeEnAnchorIndex;
+    }
+
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptIsEditableTarget(target) {
+    if (!target) {
+        return false;
+    }
+    const tag = target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return true;
+    }
+    return !!target.isContentEditable;
+}
+
+function forgeEnPromptGetVisibleMainTab() {
+    const app = gradioApp();
+    if (!app) {
+        return "txt2img";
+    }
+    const tabTxt2img = app.getElementById("tab_txt2img");
+    const tabImg2img = app.getElementById("tab_img2img");
+    if (tabTxt2img && tabTxt2img.style.display !== "none") {
+        return "txt2img";
+    }
+    if (tabImg2img && tabImg2img.style.display !== "none") {
+        return "img2img";
+    }
+    return "txt2img";
+}
+
+function forgeEnPromptDeleteSelectedFromKeyboard() {
+    const tabname = forgeEnPromptGetVisibleMainTab();
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    if (!container) {
+        return false;
+    }
+
+    const indices = forgeEnPromptGetSelectedIndices(container);
+    if (indices.length === 0) {
+        return false;
+    }
+
+    forgeEnPromptRemoveIndices(tabname, indices);
+    return true;
+}
+
+function forgeEnPromptKeyHandler(event) {
+    if (event.key !== "Delete" && event.key !== "Del") {
+        return;
+    }
+    if (forgeEnPromptIsEditableTarget(event.target)) {
+        return;
+    }
+    if (forgeEnPromptDeleteSelectedFromKeyboard()) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}
+
+function forgeEnPromptEnsureKeyListener() {
+    if (window._forgeEnPromptKeyListener) {
+        return;
+    }
+    window._forgeEnPromptKeyListener = true;
+    document.addEventListener("keydown", forgeEnPromptKeyHandler, true);
+}
+
 function forgeEnPromptUpdateAt(tabname, index, newText) {
     const textarea = forgeEnPromptGetTextarea(tabname);
     if (!textarea) return;
@@ -504,6 +742,94 @@ function forgeEnPromptMoveAfter(tabname, fromIndex, toIndex) {
     const item = parts.splice(fromIndex, 1)[0];
     parts.splice(insertAt, 0, item);
     forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+}
+
+function forgeEnPromptNormalizeSortedIndices(indices) {
+    const seen = new Set();
+    const sorted = [];
+    indices.forEach(function (index) {
+        if (index >= 0 && !seen.has(index)) {
+            seen.add(index);
+            sorted.push(index);
+        }
+    });
+    sorted.sort(function (a, b) {
+        return a - b;
+    });
+    return sorted;
+}
+
+function forgeEnPromptGetBlockInsertAt(selectedIndices, dropIndex, insertBefore) {
+    const sorted = forgeEnPromptNormalizeSortedIndices(selectedIndices);
+    const rawTarget = insertBefore ? dropIndex : dropIndex + 1;
+    const offset = sorted.filter(function (index) {
+        return index < rawTarget;
+    }).length;
+    return rawTarget - offset;
+}
+
+function forgeEnPromptSetPendingSelection(container, indices) {
+    if (!container || !indices || indices.length === 0) {
+        return;
+    }
+    container.dataset.forgeEnPendingSelection = indices.join(",");
+}
+
+function forgeEnPromptMoveBlock(
+    tabname,
+    container,
+    selectedIndices,
+    dropIndex,
+    insertBefore,
+) {
+    const sorted = forgeEnPromptNormalizeSortedIndices(selectedIndices);
+    if (sorted.length <= 1) {
+        return null;
+    }
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return null;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (dropIndex < 0 || dropIndex >= parts.length) {
+        return null;
+    }
+
+    const insertAt = forgeEnPromptGetBlockInsertAt(
+        sorted,
+        dropIndex,
+        insertBefore,
+    );
+    if (insertAt === sorted[0]) {
+        return null;
+    }
+
+    const block = sorted.map(function (index) {
+        return parts[index];
+    });
+    for (let i = sorted.length - 1; i >= 0; i--) {
+        parts.splice(sorted[i], 1);
+    }
+
+    const clampedInsert = Math.max(0, Math.min(insertAt, parts.length));
+    parts.splice(clampedInsert, 0, ...block);
+
+    const newSelection = sorted.map(function (_item, offset) {
+        return clampedInsert + offset;
+    });
+    forgeEnPromptSetPendingSelection(container, newSelection);
+    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    return clampedInsert;
+}
+
+function forgeEnPromptApplyDraggingVisuals(container, dragIndices) {
+    forgeEnPromptGetTagButtons(container).forEach(function (button, index) {
+        if (dragIndices.indexOf(index) >= 0) {
+            button.classList.add(FORGE_EN_PROMPT_TAG_CLASS_DRAGGING);
+        }
+    });
 }
 
 function forgeEnPromptClearDragVisuals(container) {
@@ -597,24 +923,45 @@ function forgeEnPromptFinishDrag(event, container) {
             !Number.isNaN(state.dropIndex) &&
             state.insertBefore !== null
         ) {
-            const insertAt = forgeEnPromptGetInsertAt(
-                state.fromIndex,
-                state.dropIndex,
-                state.insertBefore,
-            );
-            if (insertAt !== state.fromIndex) {
-                if (state.insertBefore) {
-                    forgeEnPromptMoveBefore(
+            const dragIndices = state.dragIndices || [state.fromIndex];
+
+            if (dragIndices.length > 1) {
+                const blockInsertAt = forgeEnPromptGetBlockInsertAt(
+                    dragIndices,
+                    state.dropIndex,
+                    state.insertBefore,
+                );
+                if (blockInsertAt !== dragIndices[0]) {
+                    forgeEnPromptMoveBlock(
                         state.tabname,
-                        state.fromIndex,
+                        container,
+                        dragIndices,
                         state.dropIndex,
+                        state.insertBefore,
                     );
-                } else {
-                    forgeEnPromptMoveAfter(
-                        state.tabname,
-                        state.fromIndex,
-                        state.dropIndex,
-                    );
+                }
+            } else {
+                const insertAt = forgeEnPromptGetInsertAt(
+                    state.fromIndex,
+                    state.dropIndex,
+                    state.insertBefore,
+                );
+                if (insertAt !== state.fromIndex) {
+                    forgeEnPromptClearSelection(container);
+                    delete container.dataset.forgeEnAnchorIndex;
+                    if (state.insertBefore) {
+                        forgeEnPromptMoveBefore(
+                            state.tabname,
+                            state.fromIndex,
+                            state.dropIndex,
+                        );
+                    } else {
+                        forgeEnPromptMoveAfter(
+                            state.tabname,
+                            state.fromIndex,
+                            state.dropIndex,
+                        );
+                    }
                 }
             }
         }
@@ -1226,6 +1573,20 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         return;
     }
 
+    const pendingRaw = container.dataset.forgeEnPendingSelection;
+    let selectedIndices;
+    if (pendingRaw !== undefined && pendingRaw !== "") {
+        selectedIndices = new Set();
+        pendingRaw.split(",").forEach(function (raw) {
+            const index = parseInt(raw, 10);
+            if (!Number.isNaN(index)) {
+                selectedIndices.add(index);
+            }
+        });
+        delete container.dataset.forgeEnPendingSelection;
+    } else {
+        selectedIndices = new Set(forgeEnPromptGetSelectedIndices(container));
+    }
     const parts = forgeEnPromptSplitParts(textarea ? textarea.value || "" : "");
     const fragment = document.createDocumentFragment();
 
@@ -1238,6 +1599,9 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
             FORGE_EN_PROMPT_TAG_CLASS +
             (typeClass ? " " + typeClass : "");
         button.dataset.index = String(index);
+        if (selectedIndices.has(index)) {
+            button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+        }
         if (forgeEnPromptIsNewlinePart(part)) {
             button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
         } else {
@@ -1328,10 +1692,19 @@ function forgeEnPromptBindTagsContainers() {
             const index = parseInt(button.dataset.index, 10);
             if (Number.isNaN(index)) return;
 
+            let dragIndices = [index];
+            if (button.classList.contains(FORGE_EN_PROMPT_SELECTED_CLASS)) {
+                const selected = forgeEnPromptGetSelectedIndices(container);
+                if (selected.length > 1) {
+                    dragIndices = forgeEnPromptNormalizeSortedIndices(selected);
+                }
+            }
+
             forgeEnPromptDragState = {
                 tabname: tabname,
                 container: container,
                 fromIndex: index,
+                dragIndices: dragIndices,
                 sourceButton: button,
                 startX: event.clientX,
                 startY: event.clientY,
@@ -1367,8 +1740,9 @@ function forgeEnPromptBindTagsContainers() {
                 }
                 state.dragging = true;
                 container.classList.add(FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING);
-                state.sourceButton.classList.add(
-                    FORGE_EN_PROMPT_TAG_CLASS_DRAGGING,
+                forgeEnPromptApplyDraggingVisuals(
+                    container,
+                    state.dragIndices || [state.fromIndex],
                 );
                 forgeEnPromptHideInsertPopover();
             }
@@ -1382,10 +1756,16 @@ function forgeEnPromptBindTagsContainers() {
             const target =
                 under &&
                 under.closest("." + FORGE_EN_PROMPT_TAG_CLASS);
+            const dragIndices = state.dragIndices || [state.fromIndex];
+            const targetIndex =
+                target && target.dataset.index !== undefined
+                    ? parseInt(target.dataset.index, 10)
+                    : NaN;
             if (
                 target &&
                 container.contains(target) &&
-                target !== state.sourceButton
+                !Number.isNaN(targetIndex) &&
+                dragIndices.indexOf(targetIndex) < 0
             ) {
                 const rect = target.getBoundingClientRect();
                 const insertBefore =
@@ -1406,6 +1786,14 @@ function forgeEnPromptBindTagsContainers() {
         container.addEventListener("pointercancel", function (event) {
             forgeEnPromptFinishDrag(event, container);
         });
+
+        container.addEventListener(
+            "click",
+            function (event) {
+                forgeEnPromptHandleTagClick(event, container, tabname);
+            },
+            true,
+        );
 
         container.addEventListener("click", function (event) {
             const addBtn = event.target.closest("." + FORGE_EN_PROMPT_ADD_CLASS);
@@ -1454,6 +1842,12 @@ function forgeEnPromptBindTagsContainers() {
 
             event.preventDefault();
             event.stopPropagation();
+
+            const selected = forgeEnPromptGetSelectedIndices(container);
+            if (selected.length > 0) {
+                forgeEnPromptRemoveIndices(tabname, selected);
+                return;
+            }
 
             const index = parseInt(button.dataset.index, 10);
             if (Number.isNaN(index)) return;
@@ -1574,6 +1968,8 @@ function forgeEnPromptInstallTabSelectHook() {
 }
 
 function forgeEnPromptInit() {
+    forgeEnPromptApplySelectionOutlineStyle();
+    forgeEnPromptEnsureKeyListener();
     forgeEnPromptInstallGlobalUndoKeydown();
     forgeEnPromptBindPromptListeners();
     FORGE_EN_PROMPT_TABNAMES.forEach(forgeEnPromptRemoveLegacyToolbar);

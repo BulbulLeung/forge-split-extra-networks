@@ -819,6 +819,15 @@
     box-sizing: border-box;
 }
 
+/* Prompt tab: selection highlight (same outline as Output Browser) */
+#txt2img_en_prompt_pane .forge-en-prompt-tag.forge-en-output-selected,
+#img2img_en_prompt_pane .forge-en-prompt-tag.forge-en-output-selected {
+    outline: var(--forge-en-output-selection-outline-width, 5px) solid
+        var(--color-accent, #4a9eff);
+    outline-offset: -2px;
+    box-shadow: 0 0 12px rgba(74, 158, 255, 0.45);
+}
+
 #txt2img_en_prompt_pane .forge-en-prompt-tag--dragging,
 #img2img_en_prompt_pane .forge-en-prompt-tag--dragging {
     opacity: 0.55;
@@ -830,41 +839,42 @@
     user-select: none;
 }
 
-#txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard,
-#img2img_en_prompt_pane .forge-en-prompt-tag--wildcard {
+#txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected) {
     background-color: rgba(255, 140, 50, 0.32);
-    border-color: #e8922a;
+    border-color: transparent;
     color: var(--body-text-color, #eee);
 }
 
-#txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard:hover,
-#img2img_en_prompt_pane .forge-en-prompt-tag--wildcard:hover {
+#txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected):hover {
     background-color: rgba(255, 140, 50, 0.48);
-    border-color: #ff9f43;
+    border-color: transparent;
 }
 
-.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard,
-.dark #img2img_en_prompt_pane .forge-en-prompt-tag--wildcard {
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected),
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected) {
     background-color: rgba(255, 140, 50, 0.24);
-    border-color: #d97706;
+    border-color: transparent;
 }
 
-#txt2img_en_prompt_pane .forge-en-prompt-tag--lora,
-#img2img_en_prompt_pane .forge-en-prompt-tag--lora {
+#txt2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected) {
     background-color: rgba(74, 158, 255, 0.24);
-    border-color: var(--color-accent, #4a9eff);
+    border-color: transparent;
     color: var(--body-text-color, #eee);
 }
 
-#txt2img_en_prompt_pane .forge-en-prompt-tag--lora:hover,
-#img2img_en_prompt_pane .forge-en-prompt-tag--lora:hover {
+#txt2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected):hover {
     background-color: rgba(74, 158, 255, 0.38);
-    border-color: #6eb0ff;
+    border-color: transparent;
 }
 
-.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--lora,
-.dark #img2img_en_prompt_pane .forge-en-prompt-tag--lora {
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected),
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--lora:not(.forge-en-output-selected) {
     background-color: rgba(74, 158, 255, 0.28);
+    border-color: transparent;
 }
 
 .forge-en-prompt-insert-popover {
