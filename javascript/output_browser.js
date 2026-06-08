@@ -341,7 +341,11 @@ function forgeEnOutputBrowserKeyHandler(event) {
         const cut = event.key === "x" || event.key === "X";
         const paths = forgeEnOutputBrowserGetClipboardPathsFromKeyboard();
         forgeEnOutputBrowserCloseContextMenu();
-        forgeEnOutputBrowserCopyOrCutPaths(paths, cut);
+        forgeEnOutputBrowserCopyOrCutPaths(
+            paths,
+            cut,
+            forgeEnOutputBrowserGetClipboardTabname(),
+        );
         event.preventDefault();
         event.stopPropagation();
     }
@@ -834,6 +838,150 @@ function forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh) {
     forgeEnOutputBrowserRefreshPaneViaApi(tabname, onAfterRefresh);
 }
 
+let forgeEnPendingCutRefresh = null;
+const FORGE_EN_CUT_REFRESH_POLL_MS = 1500;
+const FORGE_EN_CUT_REFRESH_TIMEOUT_MS = 120000;
+
+function forgeEnOutputBrowserGetClipboardTabname() {
+    if (forgeEnOutputBrowserIsLightboxOpen() && forgeEnLightboxState) {
+        return (
+            FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER[
+                forgeEnLightboxState.containerId
+            ] || forgeEnOutputBrowserGetVisibleMainTab()
+        );
+    }
+
+    return (
+        forgeEnOutputBrowserGetActiveTabname() ||
+        forgeEnOutputBrowserGetVisibleMainTab()
+    );
+}
+
+function forgeEnOutputBrowserPathStillExists(filepath) {
+    if (!filepath) {
+        return Promise.resolve(false);
+    }
+
+    const url =
+        forgeEnOutputBrowserApiUrl("/forge-en-output-browser/infotext") +
+        "?filename=" +
+        encodeURIComponent(filepath);
+
+    return fetch(url)
+        .then(function (response) {
+            return response.ok;
+        })
+        .catch(function () {
+            return false;
+        });
+}
+
+function forgeEnOutputBrowserCancelCutRefreshPoll() {
+    if (!forgeEnPendingCutRefresh) {
+        return;
+    }
+
+    if (forgeEnPendingCutRefresh.pollTimer) {
+        clearTimeout(forgeEnPendingCutRefresh.pollTimer);
+    }
+    if (forgeEnPendingCutRefresh.focusListener) {
+        window.removeEventListener(
+            "focus",
+            forgeEnPendingCutRefresh.focusListener,
+        );
+    }
+    forgeEnPendingCutRefresh = null;
+}
+
+function forgeEnOutputBrowserClearAllContainerSelections() {
+    for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
+        const container = gradioApp().querySelector("#" + containerId);
+        if (container) {
+            forgeEnOutputBrowserClearSelection(container);
+        }
+    }
+}
+
+function forgeEnOutputBrowserCompleteCutRefresh(tabname) {
+    forgeEnOutputBrowserCancelCutRefreshPoll();
+    forgeEnOutputBrowserClearAllContainerSelections();
+    forgeEnOutputBrowserRefreshPane(tabname);
+}
+
+function forgeEnOutputBrowserScheduleRefreshAfterCut(tabname, paths) {
+    if (!tabname || !paths || paths.length === 0) {
+        return;
+    }
+
+    forgeEnOutputBrowserCancelCutRefreshPoll();
+
+    const startedAt = Date.now();
+    const pending = {
+        tabname: tabname,
+        paths: paths.slice(),
+        pollTimer: null,
+        focusListener: null,
+    };
+    forgeEnPendingCutRefresh = pending;
+
+    function checkPathsMoved() {
+        if (!forgeEnPendingCutRefresh || forgeEnPendingCutRefresh !== pending) {
+            return Promise.resolve(false);
+        }
+
+        return Promise.all(
+            pending.paths.map(forgeEnOutputBrowserPathStillExists),
+        ).then(function (existsResults) {
+            return existsResults.every(function (exists) {
+                return !exists;
+            });
+        });
+    }
+
+    function poll() {
+        if (!forgeEnPendingCutRefresh || forgeEnPendingCutRefresh !== pending) {
+            return;
+        }
+
+        if (Date.now() - startedAt > FORGE_EN_CUT_REFRESH_TIMEOUT_MS) {
+            forgeEnOutputBrowserCancelCutRefreshPoll();
+            return;
+        }
+
+        checkPathsMoved().then(function (allMoved) {
+            if (!forgeEnPendingCutRefresh || forgeEnPendingCutRefresh !== pending) {
+                return;
+            }
+
+            if (allMoved) {
+                forgeEnOutputBrowserCompleteCutRefresh(pending.tabname);
+                return;
+            }
+
+            pending.pollTimer = setTimeout(poll, FORGE_EN_CUT_REFRESH_POLL_MS);
+        });
+    }
+
+    pending.focusListener = function () {
+        if (!forgeEnPendingCutRefresh || forgeEnPendingCutRefresh !== pending) {
+            return;
+        }
+
+        checkPathsMoved().then(function (allMoved) {
+            if (!forgeEnPendingCutRefresh || forgeEnPendingCutRefresh !== pending) {
+                return;
+            }
+
+            if (allMoved) {
+                forgeEnOutputBrowserCompleteCutRefresh(pending.tabname);
+            }
+        });
+    };
+    window.addEventListener("focus", pending.focusListener);
+
+    poll();
+}
+
 function forgeEnOutputBrowserFindInput(root) {
     if (!root) {
         return null;
@@ -1093,7 +1241,7 @@ function forgeEnOutputBrowserClipboardPaths(paths, cut) {
     ).then(forgeEnOutputBrowserParseJsonResponse);
 }
 
-function forgeEnOutputBrowserCopyOrCutPaths(paths, cut) {
+function forgeEnOutputBrowserCopyOrCutPaths(paths, cut, tabname) {
     if (!paths || paths.length === 0) {
         return Promise.resolve(false);
     }
@@ -1106,6 +1254,12 @@ function forgeEnOutputBrowserCopyOrCutPaths(paths, cut) {
             }
             if (data.ok) {
                 forgeEnOutputBrowserShowClipboardToast(paths.length, cut);
+                if (cut && tabname) {
+                    forgeEnOutputBrowserScheduleRefreshAfterCut(
+                        tabname,
+                        paths,
+                    );
+                }
             }
             return true;
         })
@@ -1210,9 +1364,17 @@ function forgeEnOutputBrowserEnsureContextMenu() {
 
         const action = btn.dataset.action;
         if (action === "copy") {
-            forgeEnOutputBrowserCopyOrCutPaths(state.copyPaths, false);
+            forgeEnOutputBrowserCopyOrCutPaths(
+                state.copyPaths,
+                false,
+                state.tabname,
+            );
         } else if (action === "cut") {
-            forgeEnOutputBrowserCopyOrCutPaths(state.copyPaths, true);
+            forgeEnOutputBrowserCopyOrCutPaths(
+                state.copyPaths,
+                true,
+                state.tabname,
+            );
         } else if (action === "send-txt2img") {
             forgeEnOutputBrowserSendToTab("txt2img", state.sendPath);
         } else if (action === "send-img2img") {
