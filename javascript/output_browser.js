@@ -356,6 +356,7 @@ function forgeEnOutputBrowserAfterPaneUpdate(tabname) {
     }
     forgeEnOutputBrowserBindFilterSelectionSync();
     forgeEnOutputBrowserBindCardInteractions();
+    forgeEnOutputBrowserSetupCardDraggable();
     if (typeof setupAllResizeHandles === "function") {
         setupAllResizeHandles();
     }
@@ -551,6 +552,17 @@ function forgeEnOutputBrowserClearSelection(container) {
         });
 }
 
+function forgeEnOutputBrowserClearAllSelections() {
+    for (const containerId of FORGE_EN_OUTPUT_BROWSER_CARD_IDS) {
+        const container = gradioApp().querySelector("#" + containerId);
+        if (container) {
+            forgeEnOutputBrowserClearSelection(container);
+            delete container.dataset.forgeEnAnchorIndex;
+        }
+    }
+    forgeEnOutputBrowserCloseContextMenu();
+}
+
 function forgeEnOutputBrowserSelectRange(container, cards, fromIndex, toIndex) {
     const start = Math.min(fromIndex, toIndex);
     const end = Math.max(fromIndex, toIndex);
@@ -598,6 +610,10 @@ function forgeEnOutputBrowserHandleCardClick(event, container) {
     const index = cards.indexOf(card);
     if (index < 0) {
         return;
+    }
+
+    if (typeof forgeEnPromptClearAllSelections === "function") {
+        forgeEnPromptClearAllSelections();
     }
 
     const extend = event.ctrlKey || event.metaKey;
@@ -1379,6 +1395,10 @@ function forgeEnOutputBrowserSetupCardDraggable() {
         }
         container.querySelectorAll(".card").forEach(function (card) {
             card.draggable = true;
+            const img = card.querySelector("img.preview");
+            if (img) {
+                img.draggable = false;
+            }
         });
     }
 }

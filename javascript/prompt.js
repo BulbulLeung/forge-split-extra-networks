@@ -492,6 +492,16 @@ function forgeEnPromptClearSelection(container) {
         });
 }
 
+function forgeEnPromptClearAllSelections() {
+    FORGE_EN_PROMPT_TABNAMES.forEach(function (tabname) {
+        const container = forgeEnPromptGetTagsContainer(tabname);
+        if (container) {
+            forgeEnPromptClearSelection(container);
+            delete container.dataset.forgeEnAnchorIndex;
+        }
+    });
+}
+
 function forgeEnPromptGetSelectedIndices(container) {
     const indices = [];
     forgeEnPromptGetTagButtons(container).forEach(function (button) {
@@ -556,6 +566,10 @@ function forgeEnPromptHandleTagClick(event, container, tabname) {
     const index = buttons.indexOf(button);
     if (index < 0) {
         return;
+    }
+
+    if (typeof forgeEnOutputBrowserClearAllSelections === "function") {
+        forgeEnOutputBrowserClearAllSelections();
     }
 
     container.focus();
