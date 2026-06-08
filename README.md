@@ -228,8 +228,10 @@ Browses wildcard files from [sd-dynamic-prompts](https://github.com/adieyal/sd-d
 - **Drag and drop** a card onto the left **Prompt**, **gallery**, or **Generation** area: applies PNG info based on the **current main tab** (txt2img main tab → txt2img fields; img2img main tab → img2img fields)—same as right-click **Send to txt2img/img2img**.
 - **Drag and drop** onto img2img **Init / Sketch / Inpaint** canvas (ForgeCanvas) on the left: **loads the image** into the currently visible image input, same as Load image; **does not** apply PNG info. Dragging to Prompt/gallery still uses PNG info behavior above.
 - **Right-click** a card: context menu
+  - **Copy** / **Cut**: put **selected** image files on the Windows clipboard (same as Explorer file copy/cut; if nothing is selected, applies to the right-clicked image). Supports **multiple files**. **Windows only**; other platforms show an error.
   - **Send to txt2img** / **Send to img2img**: read PNG info from **the right-clicked image**, write to the corresponding tab fields, and switch the main tab (single image only).
   - **Delete**: delete **currently selected** images (if none selected, deletes the right-clicked image); confirmation dialog before delete.
+- **Ctrl+C** / **Ctrl+X** (or **Cmd** on macOS): **Copy** / **Cut** selected files to the clipboard (same rules as the context menu; in full-size preview, applies to the current image). Does not trigger while typing in an input or when focus is in the Prompt tag list.
 - **Delete key**: when images are selected in the list, **Del** behaves like right-click Delete (does not trigger while typing in an input; in full-size preview, deletes the current image).
 - List reloads when clicking **Refresh**, after delete, or on **auto-refresh after generation completes**.
 - After each txt2img / img2img generation, Output Browser refreshes by default; disable with “auto-refresh after generation completes” in Settings. **Refresh** remains available anytime.

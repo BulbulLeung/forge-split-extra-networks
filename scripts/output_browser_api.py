@@ -14,6 +14,7 @@ _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _EXT_DIR not in sys.path:
     sys.path.insert(0, _EXT_DIR)
 
+from forge_en_clipboard import set_clipboard_files
 from forge_en_folder import try_open_folder
 from ui_extra_networks_output_browser import ExtraNetworksPageOutputBrowser
 
@@ -49,6 +50,11 @@ def validate_output_file(filepath: str) -> Path:
 
 class DeleteRequest(BaseModel):
     paths: List[str]
+
+
+class ClipboardRequest(BaseModel):
+    paths: List[str]
+    cut: bool = False
 
 
 class ApplyRequest(BaseModel):
@@ -226,6 +232,17 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
                 failed.append({"path": raw_path, "error": str(ex)})
 
         return {"deleted": deleted, "failed": failed}
+
+    @app.post("/forge-en-output-browser/clipboard")
+    async def clipboard_files(req: ClipboardRequest):
+        if not req.paths:
+            raise HTTPException(status_code=400, detail="paths required")
+
+        validated = []
+        for raw_path in req.paths:
+            validated.append(str(validate_output_file(raw_path)))
+
+        return await asyncio.to_thread(set_clipboard_files, validated, req.cut)
 
     @app.post("/forge-en-output-browser/apply")
     async def apply_to_tab(req: ApplyRequest):

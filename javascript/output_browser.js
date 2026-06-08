@@ -43,6 +43,8 @@ const FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER = {
     img2img_output_browser_cards: "img2img",
 };
 
+const FORGE_EN_OUTPUT_BROWSER_PAGE = "output_browser";
+
 const FORGE_EN_OUTPUT_PATH_MIME = "application/x-forge-en-output-path";
 const FORGE_EN_OUTPUT_PREVIEW_URL_MIME =
     "application/x-forge-en-output-preview-url";
@@ -80,6 +82,56 @@ let forgeEnContextMenuState = null;
 
 const forgeEnOutputScrollRestore = Object.create(null);
 let forgeEnLightboxState = null;
+
+let forgeEnClipboardToastEl = null;
+let forgeEnClipboardToastHideTimer = null;
+let forgeEnClipboardToastRemoveTimer = null;
+const FORGE_EN_CLIPBOARD_TOAST_VISIBLE_MS = 1500;
+const FORGE_EN_CLIPBOARD_TOAST_FADE_MS = 400;
+
+function forgeEnOutputBrowserEnsureClipboardToast() {
+    if (forgeEnClipboardToastEl) {
+        return forgeEnClipboardToastEl;
+    }
+
+    const toast = document.createElement("div");
+    toast.id = "forgeEnOutputClipboardToast";
+    toast.className = "forge-en-output-clipboard-toast";
+    toast.style.display = "none";
+
+    gradioApp().appendChild(toast);
+    forgeEnClipboardToastEl = toast;
+    return toast;
+}
+
+function forgeEnOutputBrowserShowClipboardToast(pathCount, cut) {
+    const count = Math.max(1, parseInt(pathCount, 10) || 1);
+    const toast = forgeEnOutputBrowserEnsureClipboardToast();
+    const verb = cut ? "Cut" : "Copy";
+    const noun = count === 1 ? "image" : "images";
+    toast.textContent =
+        verb + " (" + count + ") " + noun + " to clipboard";
+
+    if (forgeEnClipboardToastHideTimer) {
+        clearTimeout(forgeEnClipboardToastHideTimer);
+        forgeEnClipboardToastHideTimer = null;
+    }
+    if (forgeEnClipboardToastRemoveTimer) {
+        clearTimeout(forgeEnClipboardToastRemoveTimer);
+        forgeEnClipboardToastRemoveTimer = null;
+    }
+
+    toast.classList.remove("forge-en-output-clipboard-toast--fade-out");
+    toast.style.display = "block";
+
+    forgeEnClipboardToastHideTimer = setTimeout(function () {
+        toast.classList.add("forge-en-output-clipboard-toast--fade-out");
+        forgeEnClipboardToastRemoveTimer = setTimeout(function () {
+            toast.style.display = "none";
+            toast.classList.remove("forge-en-output-clipboard-toast--fade-out");
+        }, FORGE_EN_CLIPBOARD_TOAST_FADE_MS);
+    }, FORGE_EN_CLIPBOARD_TOAST_VISIBLE_MS);
+}
 
 function forgeEnOutputBrowserEnsureLightbox() {
     let overlay = gradioApp().querySelector("#forgeEnOutputLightbox");
@@ -154,6 +206,38 @@ function forgeEnOutputBrowserIsEditableTarget(target) {
         return true;
     }
     return !!target.isContentEditable;
+}
+
+function forgeEnOutputBrowserIsTabActive(tabname) {
+    const app = gradioApp();
+    if (!app) {
+        return false;
+    }
+
+    const tabBtn = app.querySelector("#" + tabname + "_output_browser");
+    if (tabBtn && tabBtn.classList.contains("selected")) {
+        return true;
+    }
+
+    const columns = app.querySelectorAll(
+        "#" + tabname + "_extra_tabs .forge-en-column",
+    );
+    for (let i = 0; i < columns.length; i++) {
+        if (columns[i].dataset.forgeEnActiveSlug === FORGE_EN_OUTPUT_BROWSER_PAGE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function forgeEnOutputBrowserGetActiveTabname() {
+    if (forgeEnOutputBrowserIsTabActive("txt2img")) {
+        return "txt2img";
+    }
+    if (forgeEnOutputBrowserIsTabActive("img2img")) {
+        return "img2img";
+    }
+    return null;
 }
 
 function forgeEnOutputBrowserGetVisibleMainTab() {
@@ -239,6 +323,27 @@ function forgeEnOutputBrowserKeyHandler(event) {
             event.preventDefault();
             event.stopPropagation();
         }
+        return;
+    }
+
+    if (!(event.ctrlKey || event.metaKey)) {
+        return;
+    }
+    if (
+        event.key !== "c" &&
+        event.key !== "C" &&
+        event.key !== "x" &&
+        event.key !== "X"
+    ) {
+        return;
+    }
+    if (forgeEnOutputBrowserShouldHandleClipboardKeyboard(event)) {
+        const cut = event.key === "x" || event.key === "X";
+        const paths = forgeEnOutputBrowserGetClipboardPathsFromKeyboard();
+        forgeEnOutputBrowserCloseContextMenu();
+        forgeEnOutputBrowserCopyOrCutPaths(paths, cut);
+        event.preventDefault();
+        event.stopPropagation();
     }
 }
 
@@ -977,9 +1082,97 @@ function forgeEnOutputBrowserGetDeletePaths(container, contextCard) {
     return paths;
 }
 
+function forgeEnOutputBrowserClipboardPaths(paths, cut) {
+    return fetch(
+        forgeEnOutputBrowserApiUrl("/forge-en-output-browser/clipboard"),
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paths: paths, cut: cut }),
+        },
+    ).then(forgeEnOutputBrowserParseJsonResponse);
+}
+
+function forgeEnOutputBrowserCopyOrCutPaths(paths, cut) {
+    if (!paths || paths.length === 0) {
+        return Promise.resolve(false);
+    }
+
+    return forgeEnOutputBrowserClipboardPaths(paths, cut)
+        .then(function (data) {
+            if (!data.ok && data.error) {
+                alert(data.error);
+                return false;
+            }
+            if (data.ok) {
+                forgeEnOutputBrowserShowClipboardToast(paths.length, cut);
+            }
+            return true;
+        })
+        .catch(function (err) {
+            alert(err.message || "Clipboard failed");
+            return false;
+        });
+}
+
+function forgeEnOutputBrowserGetLightboxPath() {
+    if (!forgeEnLightboxState || !forgeEnLightboxState.entries) {
+        return null;
+    }
+
+    const entry = forgeEnLightboxState.entries[forgeEnLightboxState.index];
+    return entry && entry.path ? entry.path : null;
+}
+
+function forgeEnOutputBrowserGetClipboardPathsFromKeyboard() {
+    if (forgeEnOutputBrowserIsLightboxOpen()) {
+        const path = forgeEnOutputBrowserGetLightboxPath();
+        return path ? [path] : [];
+    }
+
+    const activeTab = forgeEnOutputBrowserGetActiveTabname();
+    if (!activeTab) {
+        return [];
+    }
+
+    const container = gradioApp().querySelector(
+        "#" + activeTab + "_output_browser_cards",
+    );
+    if (!container) {
+        return [];
+    }
+
+    return forgeEnOutputBrowserGetDeletePaths(container, null);
+}
+
+function forgeEnOutputBrowserShouldHandleClipboardKeyboard(event) {
+    if (forgeEnOutputBrowserIsEditableTarget(event.target)) {
+        return false;
+    }
+
+    if (event.target && event.target.closest('[id$="_en_prompt_tags"]')) {
+        return false;
+    }
+
+    const paths = forgeEnOutputBrowserGetClipboardPathsFromKeyboard();
+    if (paths.length === 0) {
+        return false;
+    }
+
+    if (forgeEnOutputBrowserIsLightboxOpen()) {
+        return true;
+    }
+
+    return !!forgeEnOutputBrowserGetActiveTabname();
+}
+
 function forgeEnOutputBrowserEnsureContextMenu() {
     if (forgeEnContextMenuEl) {
-        return forgeEnContextMenuEl;
+        if (forgeEnContextMenuEl.querySelector('[data-action="copy"]')) {
+            return forgeEnContextMenuEl;
+        }
+        forgeEnContextMenuEl.remove();
+        forgeEnContextMenuEl = null;
     }
 
     const menu = document.createElement("div");
@@ -989,6 +1182,8 @@ function forgeEnOutputBrowserEnsureContextMenu() {
     menu.innerHTML =
         '<button type="button" data-action="send-txt2img">Send to txt2img</button>' +
         '<button type="button" data-action="send-img2img">Send to img2img</button>' +
+        '<button type="button" data-action="copy">Copy</button>' +
+        '<button type="button" data-action="cut">Cut</button>' +
         '<button type="button" data-action="delete" class="forge-en-output-context-menu-danger">Delete</button>';
 
     function forgeEnOutputBrowserHandleMenuAction(event) {
@@ -1004,6 +1199,7 @@ function forgeEnOutputBrowserEnsureContextMenu() {
         const state = {
             tabname: forgeEnContextMenuState.tabname,
             sendPath: forgeEnContextMenuState.sendPath,
+            copyPaths: forgeEnContextMenuState.copyPaths.slice(),
             deletePaths: forgeEnContextMenuState.deletePaths.slice(),
         };
         forgeEnOutputBrowserCloseContextMenu();
@@ -1013,7 +1209,11 @@ function forgeEnOutputBrowserEnsureContextMenu() {
         }
 
         const action = btn.dataset.action;
-        if (action === "send-txt2img") {
+        if (action === "copy") {
+            forgeEnOutputBrowserCopyOrCutPaths(state.copyPaths, false);
+        } else if (action === "cut") {
+            forgeEnOutputBrowserCopyOrCutPaths(state.copyPaths, true);
+        } else if (action === "send-txt2img") {
             forgeEnOutputBrowserSendToTab("txt2img", state.sendPath);
         } else if (action === "send-img2img") {
             forgeEnOutputBrowserSendToTab("img2img", state.sendPath);
@@ -1078,13 +1278,22 @@ function forgeEnOutputBrowserShowContextMenu(event, container, containerId) {
 
     const tabname = FORGE_EN_OUTPUT_BROWSER_TAB_BY_CONTAINER[containerId] || "txt2img";
     const sendPath = forgeEnOutputBrowserGetCardPath(card);
-    const deletePaths = forgeEnOutputBrowserGetDeletePaths(container, card);
+    const copyPaths = forgeEnOutputBrowserGetDeletePaths(container, card);
+    const deletePaths = copyPaths;
 
     const menu = forgeEnOutputBrowserEnsureContextMenu();
+    const copyBtn = menu.querySelector('[data-action="copy"]');
+    const cutBtn = menu.querySelector('[data-action="cut"]');
     const sendTxt2img = menu.querySelector('[data-action="send-txt2img"]');
     const sendImg2img = menu.querySelector('[data-action="send-img2img"]');
     const deleteBtn = menu.querySelector('[data-action="delete"]');
 
+    if (copyBtn) {
+        copyBtn.disabled = copyPaths.length === 0;
+    }
+    if (cutBtn) {
+        cutBtn.disabled = copyPaths.length === 0;
+    }
     sendTxt2img.disabled = !sendPath;
     sendImg2img.disabled = !sendPath;
     deleteBtn.disabled = deletePaths.length === 0;
@@ -1092,6 +1301,7 @@ function forgeEnOutputBrowserShowContextMenu(event, container, containerId) {
     forgeEnContextMenuState = {
         tabname: tabname,
         sendPath: sendPath,
+        copyPaths: copyPaths,
         deletePaths: deletePaths,
     };
 
