@@ -664,6 +664,101 @@ function forgeEnPromptGetVisibleMainTab() {
     return "txt2img";
 }
 
+function forgeEnPromptPartToCopyText(part) {
+    return forgeEnPromptIsNewlinePart(part) ? "\\n" : part;
+}
+
+function forgeEnPromptGetActivePromptTabname() {
+    for (let i = 0; i < FORGE_EN_PROMPT_TABNAMES.length; i++) {
+        const tabname = FORGE_EN_PROMPT_TABNAMES[i];
+        if (forgeEnPromptIsPromptTabActive(tabname)) {
+            return tabname;
+        }
+    }
+    return null;
+}
+
+function forgeEnPromptCopySelectedTags(tabname) {
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    if (!container) {
+        return false;
+    }
+
+    const indices = forgeEnPromptGetSelectedIndices(container);
+    if (indices.length === 0) {
+        return false;
+    }
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return false;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    indices.sort(function (a, b) {
+        return a - b;
+    });
+    const text = indices
+        .map(function (index) {
+            return parts[index];
+        })
+        .filter(function (part) {
+            return part !== undefined;
+        })
+        .map(forgeEnPromptPartToCopyText)
+        .join(FORGE_EN_PROMPT_SEPARATOR);
+
+    if (!text) {
+        return false;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(function () {});
+    }
+    return true;
+}
+
+async function forgeEnPromptPasteTagsAtEnd(tabname) {
+    if (!tabname) {
+        return;
+    }
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        return;
+    }
+
+    let clipText;
+    try {
+        clipText = await navigator.clipboard.readText();
+    } catch (err) {
+        return;
+    }
+
+    const parsed = forgeEnPromptSplitParts(clipText)
+        .map(function (part) {
+            if (part === "\\n") {
+                return FORGE_EN_PROMPT_NEWLINE_MARKER;
+            }
+            return part;
+        })
+        .filter(function (part) {
+            return part.length > 0;
+        });
+    if (parsed.length === 0) {
+        return;
+    }
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const endIndex = parts.length > 0 ? parts.length - 1 : -1;
+
+    forgeEnPromptHideTagTooltip();
+    forgeEnPromptInsertMultipleAfter(tabname, endIndex, parsed);
+}
+
 function forgeEnPromptDeleteSelectedFromKeyboard() {
     const tabname = forgeEnPromptGetVisibleMainTab();
     const container = forgeEnPromptGetTagsContainer(tabname);
@@ -680,16 +775,45 @@ function forgeEnPromptDeleteSelectedFromKeyboard() {
     return true;
 }
 
-function forgeEnPromptKeyHandler(event) {
-    if (event.key !== "Delete" && event.key !== "Del") {
-        return;
-    }
+function forgeEnPromptShouldHandleTagKeyboard(event) {
     if (forgeEnPromptIsEditableTarget(event.target)) {
+        return false;
+    }
+    return !!forgeEnPromptGetActivePromptTabname();
+}
+
+function forgeEnPromptKeyHandler(event) {
+    if (event.key === "Delete" || event.key === "Del") {
+        if (forgeEnPromptIsEditableTarget(event.target)) {
+            return;
+        }
+        if (forgeEnPromptDeleteSelectedFromKeyboard()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
         return;
     }
-    if (forgeEnPromptDeleteSelectedFromKeyboard()) {
+
+    if (!(event.ctrlKey || event.metaKey)) {
+        return;
+    }
+    if (!forgeEnPromptShouldHandleTagKeyboard(event)) {
+        return;
+    }
+
+    const tabname = forgeEnPromptGetActivePromptTabname();
+    if (event.key === "c" || event.key === "C") {
+        if (forgeEnPromptCopySelectedTags(tabname)) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        return;
+    }
+
+    if (event.key === "v" || event.key === "V") {
         event.preventDefault();
         event.stopPropagation();
+        forgeEnPromptPasteTagsAtEnd(tabname);
     }
 }
 

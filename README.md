@@ -129,10 +129,14 @@ Mirrors the **left-side prompt textarea** as a row of tag buttons in Extra Netwo
 #### Actions
 
 - **Mouse over** a tag: show a tooltip with the full tag text; when Local AI is enabled, a translation may appear below (see [Local AI](#local-ai-optional)).
+- **Single-click** a tag: select it (clears other selections). **Ctrl+click** (or **Cmd+click** on macOS): toggle selection. **Shift+click**: range-select contiguous tags by index.
 - **Drag** a tag: reorder segments (drop indicator shows insert position).
 - **Double-click** a tag: open an **Edit** popover to change that segment's text (type `\n` to keep or insert a line break). **Enter** confirms; **Esc** cancels.
 - **Click** the trailing **+** button: open an **Insert** popover to add text after the last tag. **Enter** confirms; **Esc** cancels. Supports Local AI smart insert when enabled (see below).
 - **Right-click** a tag: **remove** that segment from the prompt.
+- **Ctrl+C** (or **Cmd+C** on macOS): copy selected tags to the clipboard, joined with `, ` (newline tags export as `\n`). Requires at least one selected tag; does not override copy while typing in the left prompt or Edit/Insert popover.
+- **Ctrl+V** (or **Cmd+V** on macOS): append tags from the clipboard to the end of the prompt (`\n` and commas split into separate tags; does not use Local AI). Same focus rules as **Ctrl+C**.
+- **Delete**: remove all selected tags (does not trigger while typing in an input).
 - **Ctrl+Z** / **Ctrl+Shift+Z** (or **Cmd** on macOS): undo / redo prompt edits while the Prompt tab is active (local history, up to 16 steps).
 
 #### Local AI (optional)
