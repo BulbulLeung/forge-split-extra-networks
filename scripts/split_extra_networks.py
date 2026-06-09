@@ -87,7 +87,7 @@ shared.options_templates.update(
                 "Remember panel width after resize (localStorage)",
             ),
             "forge_en_split_pane_viewport_offset_px": shared.OptionInfo(
-                320,
+                512,
                 "Extra Networks preview pane: viewport offset (px)",
                 gr.Slider,
                 {"minimum": 80, "maximum": 600, "step": 8},
@@ -187,15 +187,15 @@ shared.options_templates.update(
                 {"minimum": 280, "maximum": 2000, "step": 10},
             ),
             "forge_en_column_1_tabs": shared.OptionInfo(
-                "output browser,prompt,wildcard,lora,checkpoints,textual inversion",
+                "prompt,output browser",
                 "Column 1: Extra Network tabs (comma-separated slugs)",
             ).needs_reload_ui(),
             "forge_en_column_2_tabs": shared.OptionInfo(
-                "",
+                "wildcard",
                 "Column 2: Extra Network tabs (comma-separated slugs)",
             ).needs_reload_ui(),
             "forge_en_column_3_tabs": shared.OptionInfo(
-                "",
+                "lora,checkpoints,textual inversion",
                 "Column 3: Extra Network tabs (comma-separated slugs)",
             ).needs_reload_ui(),
             "forge_en_column_1_default_tab": shared.OptionInfo(
@@ -205,13 +205,13 @@ shared.options_templates.update(
                 _forge_en_tab_dropdown,
             ).needs_reload_ui(),
             "forge_en_column_2_default_tab": shared.OptionInfo(
-                "lora",
+                "wildcard",
                 "Column 2: default tab on startup",
                 gr.Dropdown,
                 _forge_en_tab_dropdown,
             ).needs_reload_ui(),
             "forge_en_column_3_default_tab": shared.OptionInfo(
-                "checkpoints",
+                "lora",
                 "Column 3: default tab on startup",
                 gr.Dropdown,
                 _forge_en_tab_dropdown,
