@@ -901,6 +901,25 @@
     border-color: transparent;
 }
 
+#txt2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected) {
+    background-color: rgba(231, 76, 60, 0.32);
+    border-color: transparent;
+    color: var(--body-text-color, #eee);
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected):hover {
+    background-color: rgba(231, 76, 60, 0.48);
+    border-color: transparent;
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected),
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--break:not(.forge-en-output-selected) {
+    background-color: rgba(231, 76, 60, 0.24);
+    border-color: transparent;
+}
+
 .forge-en-prompt-insert-popover {
     display: none;
     position: fixed;

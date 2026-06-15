@@ -10,6 +10,7 @@ const FORGE_EN_PROMPT_TAG_CLASS = "forge-en-prompt-tag";
 const FORGE_EN_PROMPT_ADD_CLASS = "forge-en-prompt-add";
 const FORGE_EN_PROMPT_TAG_CLASS_WILDCARD = "forge-en-prompt-tag--wildcard";
 const FORGE_EN_PROMPT_TAG_CLASS_LORA = "forge-en-prompt-tag--lora";
+const FORGE_EN_PROMPT_TAG_CLASS_BREAK = "forge-en-prompt-tag--break";
 const FORGE_EN_PROMPT_NEWLINE_MARKER = "\u0001";
 const FORGE_EN_PROMPT_NEWLINE_LABEL = "\\n";
 const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
@@ -371,10 +372,15 @@ function forgeEnPromptIsLoraPart(part) {
     );
 }
 
+function forgeEnPromptIsBreakPart(part) {
+    return part === "BREAK";
+}
+
 function forgeEnPromptTagTooltipNeedsTranslation(partText) {
     return (
         !forgeEnPromptIsLoraPart(partText) &&
-        !forgeEnPromptIsWildcardPart(partText)
+        !forgeEnPromptIsWildcardPart(partText) &&
+        !forgeEnPromptIsBreakPart(partText)
     );
 }
 
@@ -387,6 +393,9 @@ function forgeEnPromptTagTypeClass(part) {
     }
     if (forgeEnPromptIsWildcardPart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_WILDCARD;
+    }
+    if (forgeEnPromptIsBreakPart(part)) {
+        return FORGE_EN_PROMPT_TAG_CLASS_BREAK;
     }
     return "";
 }
