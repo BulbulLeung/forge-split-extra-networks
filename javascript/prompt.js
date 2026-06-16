@@ -32,6 +32,14 @@ const FORGE_EN_PROMPT_SELECTED_CLASS = "forge-en-output-selected";
 const FORGE_EN_PROMPT_SELECTION_OUTLINE_DEFAULT_PX = 5;
 const FORGE_EN_PROMPT_SELECTION_OUTLINE_MIN_PX = 1;
 const FORGE_EN_PROMPT_SELECTION_OUTLINE_MAX_PX = 12;
+const FORGE_EN_PROMPT_WEIGHT_STEP = 0.1;
+const FORGE_EN_PROMPT_WEIGHT_MIN = 0;
+const FORGE_EN_PROMPT_TAG_WRAP_CLASS = "forge-en-prompt-tag-wrap";
+const FORGE_EN_PROMPT_WEIGHT_CONTROLS_CLASS = "forge-en-prompt-weight-controls";
+const FORGE_EN_PROMPT_WEIGHT_BTN_CLASS = "forge-en-prompt-weight-btn";
+const FORGE_EN_PROMPT_WEIGHT_BTN_PLUS_CLASS = "forge-en-prompt-weight-btn--plus";
+const FORGE_EN_PROMPT_WEIGHT_BTN_MINUS_CLASS =
+    "forge-en-prompt-weight-btn--minus";
 
 const forgeEnPromptBound = {
     prompt: Object.create(null),
@@ -412,7 +420,7 @@ function forgeEnPromptEscapeHtml(text) {
         .replace(/'/g, "&#39;");
 }
 
-function forgeEnPromptAnalyzeParenLine(parts) {
+function forgeEnPromptAnalyzeParenLineMeta(parts) {
     const styles = parts.map(function (part) {
         const arr = new Array(part.length);
         for (let i = 0; i < part.length; i++) {
@@ -420,6 +428,8 @@ function forgeEnPromptAnalyzeParenLine(parts) {
         }
         return arr;
     });
+    const closingPartIndices = new Set();
+    const closedGroups = [];
 
     let depth = 0;
     let openAnchor = null;
@@ -437,8 +447,14 @@ function forgeEnPromptAnalyzeParenLine(parts) {
             } else if (ch === ")") {
                 if (depth > 0) {
                     styles[p][i] = "yellow";
+                    const closedAtDepthOne = depth === 1;
                     depth--;
-                    if (depth === 0) {
+                    if (closedAtDepthOne && openAnchor !== null) {
+                        closingPartIndices.add(p);
+                        closedGroups.push({
+                            openPartIdx: openAnchor.partIdx,
+                            closePartIdx: p,
+                        });
                         openAnchor = null;
                     }
                 } else {
@@ -463,7 +479,310 @@ function forgeEnPromptAnalyzeParenLine(parts) {
         }
     }
 
-    return styles;
+    return { styles: styles, closingPartIndices: closingPartIndices, closedGroups: closedGroups };
+}
+
+function forgeEnPromptAnalyzeParenLine(parts) {
+    return forgeEnPromptAnalyzeParenLineMeta(parts).styles;
+}
+
+function forgeEnPromptFormatWeight(weight) {
+    return (Math.round(weight * 10) / 10).toFixed(1);
+}
+
+function forgeEnPromptClampWeight(weight) {
+    return Math.max(
+        FORGE_EN_PROMPT_WEIGHT_MIN,
+        Math.round(weight * 10) / 10,
+    );
+}
+
+function forgeEnPromptParseWeightedParenPart(part) {
+    const explicitMatch = part.match(/^\((.+):([\d.]+)\)$/);
+    if (explicitMatch) {
+        return {
+            inner: explicitMatch[1],
+            weight: parseFloat(explicitMatch[2]),
+            explicit: true,
+        };
+    }
+    if (part.startsWith("(") && part.endsWith(")")) {
+        return {
+            inner: part.slice(1, -1),
+            weight: 1.0,
+            explicit: false,
+        };
+    }
+    return { inner: part, weight: 1.0, explicit: false };
+}
+
+function forgeEnPromptParseClosingPartWeight(part) {
+    const explicitMatch = part.match(/^(.+):([\d.]+)\)$/);
+    if (explicitMatch) {
+        return {
+            textBefore: explicitMatch[1],
+            weight: parseFloat(explicitMatch[2]),
+            explicit: true,
+        };
+    }
+    const plainMatch = part.match(/^(.+)\)$/);
+    if (plainMatch) {
+        return {
+            textBefore: plainMatch[1],
+            weight: 1.0,
+            explicit: false,
+        };
+    }
+    return null;
+}
+
+function forgeEnPromptParseLoraPart(part) {
+    let match = part.match(/^<lora:([^:>]+):([\d.]+)>$/i);
+    if (match) {
+        return {
+            name: match[1],
+            weight: parseFloat(match[2]),
+            neg: false,
+        };
+    }
+    match = part.match(/^\(lora:([^:)]+):([\d.]+)\)$/i);
+    if (match) {
+        return {
+            name: match[1],
+            weight: parseFloat(match[2]),
+            neg: true,
+        };
+    }
+    return null;
+}
+
+function forgeEnPromptFormatLoraPart(name, weight, neg) {
+    const w = forgeEnPromptFormatWeight(weight);
+    if (neg) {
+        return "(lora:" + name + ":" + w + ")";
+    }
+    return "<lora:" + name + ":" + w + ">";
+}
+
+function forgeEnPromptFormatSingleTagWeight(inner, weight) {
+    if (weight === 1.0) {
+        return inner;
+    }
+    return (
+        "(" + inner + ":" + forgeEnPromptFormatWeight(weight) + ")"
+    );
+}
+
+function forgeEnPromptFormatClosingPartWeight(textBefore, weight) {
+    if (weight === 1.0) {
+        return textBefore + ")";
+    }
+    return textBefore + ":" + forgeEnPromptFormatWeight(weight) + ")";
+}
+
+function forgeEnPromptPartHasUnclosedStyle(styles) {
+    for (let i = 0; i < styles.length; i++) {
+        if (styles[i] === "unclosed") {
+            return true;
+        }
+    }
+    return false;
+}
+
+function forgeEnPromptPartIsInsideClosedParen(lineLocalIdx, meta) {
+    if (meta.closingPartIndices.has(lineLocalIdx)) {
+        return false;
+    }
+    return meta.styles[lineLocalIdx].some(function (style) {
+        return style === "yellow";
+    });
+}
+
+function forgeEnPromptShouldShowWeightControls(part, lineLocalIdx, meta) {
+    if (forgeEnPromptIsNewlinePart(part)) {
+        return false;
+    }
+    if (forgeEnPromptIsWildcardPart(part)) {
+        return false;
+    }
+    if (forgeEnPromptIsBreakPart(part)) {
+        return false;
+    }
+    if (forgeEnPromptPartHasUnclosedStyle(meta.styles[lineLocalIdx])) {
+        return false;
+    }
+    if (forgeEnPromptIsLoraPart(part)) {
+        return true;
+    }
+    if (meta.closingPartIndices.has(lineLocalIdx)) {
+        return true;
+    }
+    if (forgeEnPromptPartIsInsideClosedParen(lineLocalIdx, meta)) {
+        return false;
+    }
+    return true;
+}
+
+function forgeEnPromptGetLineContext(parts, globalIdx) {
+    let lineParts = [];
+    let lineGlobalIndices = [];
+
+    for (let i = 0; i < parts.length; i++) {
+        if (forgeEnPromptIsNewlinePart(parts[i])) {
+            if (lineGlobalIndices.indexOf(globalIdx) >= 0) {
+                return {
+                    lineParts: lineParts,
+                    lineGlobalIndices: lineGlobalIndices,
+                    lineLocalIdx: lineGlobalIndices.indexOf(globalIdx),
+                };
+            }
+            lineParts = [];
+            lineGlobalIndices = [];
+            continue;
+        }
+        lineParts.push(parts[i]);
+        lineGlobalIndices.push(i);
+        if (i === globalIdx) {
+            return {
+                lineParts: lineParts,
+                lineGlobalIndices: lineGlobalIndices,
+                lineLocalIdx: lineParts.length - 1,
+            };
+        }
+    }
+
+    if (lineGlobalIndices.indexOf(globalIdx) >= 0) {
+        return {
+            lineParts: lineParts,
+            lineGlobalIndices: lineGlobalIndices,
+            lineLocalIdx: lineGlobalIndices.indexOf(globalIdx),
+        };
+    }
+    return null;
+}
+
+function forgeEnPromptAdjustPartWeight(parts, globalIdx, delta) {
+    const part = parts[globalIdx];
+    if (part === undefined) {
+        return;
+    }
+
+    const lora = forgeEnPromptParseLoraPart(part);
+    if (lora) {
+        const newWeight = forgeEnPromptClampWeight(lora.weight + delta);
+        parts[globalIdx] = forgeEnPromptFormatLoraPart(
+            lora.name,
+            newWeight,
+            lora.neg,
+        );
+        return;
+    }
+
+    const ctx = forgeEnPromptGetLineContext(parts, globalIdx);
+    if (!ctx) {
+        return;
+    }
+
+    const meta = forgeEnPromptAnalyzeParenLineMeta(ctx.lineParts);
+    const localIdx = ctx.lineLocalIdx;
+
+    if (meta.closingPartIndices.has(localIdx)) {
+        const group = meta.closedGroups.find(function (g) {
+            return g.closePartIdx === localIdx;
+        });
+        if (group && group.openPartIdx === group.closePartIdx) {
+            const parsed = forgeEnPromptParseWeightedParenPart(part);
+            const newWeight = forgeEnPromptClampWeight(parsed.weight + delta);
+            parts[globalIdx] = forgeEnPromptFormatSingleTagWeight(
+                parsed.inner,
+                newWeight,
+            );
+            return;
+        }
+
+        const parsed = forgeEnPromptParseClosingPartWeight(part);
+        if (!parsed) {
+            return;
+        }
+        const newWeight = forgeEnPromptClampWeight(parsed.weight + delta);
+        parts[globalIdx] = forgeEnPromptFormatClosingPartWeight(
+            parsed.textBefore,
+            newWeight,
+        );
+        return;
+    }
+
+    const parsed = forgeEnPromptParseWeightedParenPart(part);
+    const newWeight = forgeEnPromptClampWeight(parsed.weight + delta);
+    parts[globalIdx] = forgeEnPromptFormatSingleTagWeight(
+        parsed.inner,
+        newWeight,
+    );
+}
+
+function forgeEnPromptCreateWeightControls() {
+    const controls = document.createElement("div");
+    controls.className = FORGE_EN_PROMPT_WEIGHT_CONTROLS_CLASS;
+
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className =
+        FORGE_EN_PROMPT_WEIGHT_BTN_CLASS +
+        " " +
+        FORGE_EN_PROMPT_WEIGHT_BTN_PLUS_CLASS +
+        " sm secondary gradio-button custom-button";
+    plus.textContent = "+";
+    plus.title = "Increase weight by 0.1";
+    plus.setAttribute("aria-label", "Increase weight by 0.1");
+
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.className =
+        FORGE_EN_PROMPT_WEIGHT_BTN_CLASS +
+        " " +
+        FORGE_EN_PROMPT_WEIGHT_BTN_MINUS_CLASS +
+        " sm secondary gradio-button custom-button";
+    minus.textContent = "\u2212";
+    minus.title = "Decrease weight by 0.1";
+    minus.setAttribute("aria-label", "Decrease weight by 0.1");
+
+    controls.appendChild(plus);
+    controls.appendChild(minus);
+    return controls;
+}
+
+function forgeEnPromptAlignWeightControls(container) {
+    container
+        .querySelectorAll("." + FORGE_EN_PROMPT_TAG_WRAP_CLASS)
+        .forEach(function (wrap) {
+            const tag = wrap.querySelector("." + FORGE_EN_PROMPT_TAG_CLASS);
+            const controls = wrap.querySelector(
+                "." + FORGE_EN_PROMPT_WEIGHT_CONTROLS_CLASS,
+            );
+            if (!tag || !controls) {
+                return;
+            }
+            controls.style.height = tag.getBoundingClientRect().height + "px";
+        });
+}
+
+function forgeEnPromptOnWeightButtonClick(tabname, index, delta) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (index < 0 || index >= parts.length) {
+        return;
+    }
+
+    forgeEnPromptAdjustPartWeight(parts, index, delta);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+    );
 }
 
 function forgeEnPromptBuildTagLabelFromStyles(part, styles) {
@@ -664,6 +983,10 @@ function forgeEnPromptSetAnchor(container, index) {
 
 function forgeEnPromptHandleTagClick(event, container, tabname) {
     if (event.target.closest("." + FORGE_EN_PROMPT_ADD_CLASS)) {
+        return;
+    }
+
+    if (event.target.closest("." + FORGE_EN_PROMPT_WEIGHT_BTN_CLASS)) {
         return;
     }
 
@@ -1850,7 +2173,11 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
     let lineParts = [];
     let lineIndices = [];
 
-    function forgeEnPromptAppendTagButton(part, index, partStyles) {
+    function forgeEnPromptAppendTagButton(part, index, partStyles, meta, lineLocalIdx) {
+        const wrap = document.createElement("div");
+        wrap.className = FORGE_EN_PROMPT_TAG_WRAP_CLASS;
+        wrap.dataset.index = String(index);
+
         const button = document.createElement("button");
         button.type = "button";
         const typeClass = forgeEnPromptTagTypeClass(part);
@@ -1871,19 +2198,27 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         } else {
             button.textContent = part;
         }
-        fragment.appendChild(button);
+        wrap.appendChild(button);
+
+        if (forgeEnPromptShouldShowWeightControls(part, lineLocalIdx, meta)) {
+            wrap.appendChild(forgeEnPromptCreateWeightControls());
+        }
+
+        fragment.appendChild(wrap);
     }
 
     function forgeEnPromptFlushParenLine() {
         if (lineParts.length === 0) {
             return;
         }
-        const styles = forgeEnPromptAnalyzeParenLine(lineParts);
+        const meta = forgeEnPromptAnalyzeParenLineMeta(lineParts);
         for (let i = 0; i < lineParts.length; i++) {
             forgeEnPromptAppendTagButton(
                 lineParts[i],
                 lineIndices[i],
-                styles[i],
+                meta.styles[i],
+                meta,
+                i,
             );
         }
         lineParts = [];
@@ -1923,6 +2258,10 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
     fragment.appendChild(addButton);
 
     container.replaceChildren(fragment);
+
+    requestAnimationFrame(function () {
+        forgeEnPromptAlignWeightControls(container);
+    });
 }
 
 function forgeEnPromptSyncAllTags() {
@@ -1985,6 +2324,9 @@ function forgeEnPromptBindTagsContainers() {
 
         container.addEventListener("pointerdown", function (event) {
             if (event.button !== 0) return;
+            if (event.target.closest("." + FORGE_EN_PROMPT_WEIGHT_BTN_CLASS)) {
+                return;
+            }
             if (event.target === container) {
                 container.focus();
             }
@@ -2092,6 +2434,30 @@ function forgeEnPromptBindTagsContainers() {
         container.addEventListener(
             "click",
             function (event) {
+                const weightBtn = event.target.closest(
+                    "." + FORGE_EN_PROMPT_WEIGHT_BTN_CLASS,
+                );
+                if (weightBtn && container.contains(weightBtn)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const wrap = weightBtn.closest(
+                        "." + FORGE_EN_PROMPT_TAG_WRAP_CLASS,
+                    );
+                    if (!wrap) {
+                        return;
+                    }
+                    const index = parseInt(wrap.dataset.index, 10);
+                    if (Number.isNaN(index)) {
+                        return;
+                    }
+                    const delta = weightBtn.classList.contains(
+                        FORGE_EN_PROMPT_WEIGHT_BTN_PLUS_CLASS,
+                    )
+                        ? FORGE_EN_PROMPT_WEIGHT_STEP
+                        : -FORGE_EN_PROMPT_WEIGHT_STEP;
+                    forgeEnPromptOnWeightButtonClick(tabname, index, delta);
+                    return;
+                }
                 forgeEnPromptHandleTagClick(event, container, tabname);
             },
             true,
