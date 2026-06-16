@@ -16,6 +16,7 @@ if _EXT_DIR not in sys.path:
 
 from forge_en_clipboard import set_clipboard_files
 from forge_en_folder import try_open_folder
+from forge_en_trash import move_to_trash
 from ui_extra_networks_output_browser import ExtraNetworksPageOutputBrowser
 
 
@@ -224,7 +225,7 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
         for raw_path in req.paths or []:
             try:
                 path = validate_output_file(raw_path)
-                os.remove(path)
+                await asyncio.to_thread(move_to_trash, path)
                 deleted.append(str(path))
             except HTTPException as ex:
                 failed.append({"path": raw_path, "error": ex.detail})

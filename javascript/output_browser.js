@@ -1160,10 +1160,13 @@ function forgeEnOutputBrowserPerformDelete(paths, tabname, onAfterRefresh) {
     const containerId = forgeEnOutputBrowserContainerIdForTab(tabname);
     forgeEnOutputBrowserSaveScroll(containerId);
 
+    const noun = paths.length === 1 ? "image" : "images";
     const message =
-        "確定要刪除 " +
+        "Are you sure you want to delete " +
         paths.length +
-        " 張圖片嗎？\n此操作無法復原。";
+        " " +
+        noun +
+        "?\nThe file(s) will be moved to the Recycle Bin.";
     if (!confirm(message)) {
         delete forgeEnOutputScrollRestore[containerId];
         return;
