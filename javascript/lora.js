@@ -6,6 +6,7 @@
 const FORGE_EN_LORA_TABNAMES = ["txt2img", "img2img"];
 const FORGE_EN_LORA_ACTIVE_CLASS = "forge-en-lora-active";
 const FORGE_EN_LORA_WEIGHT_STEP = 0.1;
+const FORGE_EN_LORA_SYNC_DEBOUNCE_MS = 80;
 const FORGE_EN_LORA_PROMPT_RE = /<lora:([^:>]+):([\d.]+)>/g;
 
 const forgeEnLoraBound = {
@@ -13,6 +14,8 @@ const forgeEnLoraBound = {
     cardIndex: Object.create(null),
     cards: Object.create(null),
 };
+const forgeEnLoraSyncTimers = Object.create(null);
+const forgeEnLoraLastPrompt = Object.create(null);
 
 const FORGE_EN_LORA_WEIGHT_SIZE_PRESETS = {
     small: {
@@ -70,17 +73,10 @@ function forgeEnLoraApplyWeightButtonSize() {
 }
 
 function forgeEnLoraGetPromptTextarea(tabname) {
-    if (
-        typeof activePromptTextarea !== "undefined" &&
-        activePromptTextarea[tabname]
-    ) {
-        return activePromptTextarea[tabname];
+    if (typeof forgeEnGetPromptTextarea === "function") {
+        return forgeEnGetPromptTextarea(tabname);
     }
-    const app = gradioApp();
-    if (!app) return null;
-    return app.querySelector(
-        "#" + tabname + "_prompt > label > textarea",
-    );
+    return null;
 }
 
 function forgeEnLoraTabnameFromContainer(container) {
@@ -703,6 +699,10 @@ function forgeEnLoraSyncHighlights(tabname) {
 
     const textarea = forgeEnLoraGetPromptTextarea(tabname);
     const prompt = textarea ? textarea.value || "" : "";
+    if (forgeEnLoraLastPrompt[tabname] === prompt) {
+        return;
+    }
+    forgeEnLoraLastPrompt[tabname] = prompt;
     const loraWeights = forgeEnLoraParsePrompt(prompt);
     const cardIndex = forgeEnLoraGetCardIndex(container, tabname);
 
@@ -732,7 +732,23 @@ function forgeEnLoraSyncAllHighlights() {
 }
 
 function forgeEnLoraOnPromptInput(tabname) {
-    forgeEnLoraSyncHighlights(tabname);
+    if (typeof forgeEnDebounceByKey === "function") {
+        forgeEnDebounceByKey(
+            "lora_sync_" + tabname,
+            FORGE_EN_LORA_SYNC_DEBOUNCE_MS,
+            function () {
+                forgeEnLoraSyncHighlights(tabname);
+            },
+        );
+        return;
+    }
+    if (forgeEnLoraSyncTimers[tabname]) {
+        clearTimeout(forgeEnLoraSyncTimers[tabname]);
+    }
+    forgeEnLoraSyncTimers[tabname] = setTimeout(function () {
+        delete forgeEnLoraSyncTimers[tabname];
+        forgeEnLoraSyncHighlights(tabname);
+    }, FORGE_EN_LORA_SYNC_DEBOUNCE_MS);
 }
 
 function forgeEnLoraBindPromptListeners() {

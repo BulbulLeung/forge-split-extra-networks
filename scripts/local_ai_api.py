@@ -1,4 +1,6 @@
+import asyncio
 import re
+from functools import lru_cache
 from typing import Any
 
 import gradio as gr
@@ -86,7 +88,11 @@ def _wildcard_wrap_literal() -> str:
 
 
 def _wildcard_pattern() -> re.Pattern[str] | None:
-    wrap = _wildcard_wrap_literal()
+    return _wildcard_pattern_cached(_wildcard_wrap_literal())
+
+
+@lru_cache(maxsize=8)
+def _wildcard_pattern_cached(wrap: str) -> re.Pattern[str] | None:
     if not wrap:
         return None
     escaped = re.escape(wrap)
@@ -493,7 +499,8 @@ def register_local_ai_routes(_: gr.Blocks, app: FastAPI):
             return {"ok": True, "error": None}
 
         try:
-            call_local_ai(
+            await asyncio.to_thread(
+                call_local_ai,
                 "Reply with exactly: ok",
                 "ping",
             )
@@ -513,7 +520,7 @@ def register_local_ai_routes(_: gr.Blocks, app: FastAPI):
             return {"translation": "", "error": None}
 
         try:
-            translation = translate_for_tooltip(text)
+            translation = await asyncio.to_thread(translate_for_tooltip, text)
             return {"translation": translation, "error": None}
         except LocalAIConnectionError as ex:
             return {"translation": "", "error": str(ex)}
@@ -523,7 +530,7 @@ def register_local_ai_routes(_: gr.Blocks, app: FastAPI):
     @app.post("/forge-en-local-ai/process-insert")
     async def process_insert(req: ProcessInsertRequest):
         try:
-            result = process_insert_text(req.text)
+            result = await asyncio.to_thread(process_insert_text, req.text)
             return {**result, "error": None}
         except LocalAIConnectionError as ex:
             return {"text": None, "parts": None, "error": str(ex)}

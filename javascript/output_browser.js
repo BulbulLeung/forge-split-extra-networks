@@ -835,6 +835,13 @@ function forgeEnOutputBrowserRefreshPaneViaApi(tabname, onAfterRefresh) {
 }
 
 function forgeEnOutputBrowserRefreshPane(tabname, onAfterRefresh) {
+    const refreshBtn = gradioApp().getElementById(
+        tabname + "_output_browser_extra_refresh_internal",
+    );
+    if (refreshBtn) {
+        forgeEnOutputBrowserRefreshPaneFallback(tabname, onAfterRefresh);
+        return;
+    }
     forgeEnOutputBrowserRefreshPaneViaApi(tabname, onAfterRefresh);
 }
 
@@ -863,13 +870,14 @@ function forgeEnOutputBrowserPathStillExists(filepath) {
     }
 
     const url =
-        forgeEnOutputBrowserApiUrl("/forge-en-output-browser/infotext") +
+        forgeEnOutputBrowserApiUrl("/forge-en-output-browser/exists") +
         "?filename=" +
         encodeURIComponent(filepath);
 
     return fetch(url)
-        .then(function (response) {
-            return response.ok;
+        .then(forgeEnOutputBrowserParseJsonResponse)
+        .then(function (data) {
+            return data.exists === true;
         })
         .catch(function () {
             return false;

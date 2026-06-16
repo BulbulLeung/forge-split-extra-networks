@@ -1,10 +1,11 @@
 import html
+import heapq
 import os
 from typing import Optional
 
 from forge_en_folder import inject_open_folder_button
 from modules import shared, ui_extra_networks
-from modules.ui_extra_networks import allowed_preview_extensions, quote_js
+from modules.ui_extra_networks import allowed_preview_extensions
 
 _OUTPUT_TABS = ("txt2img", "img2img")
 
@@ -144,13 +145,12 @@ class ExtraNetworksPageOutputBrowser(ui_extra_networks.ExtraNetworksPage):
     def _collect_image_files_for_outdir(self, outdir: str, labels: list[str], max_items: int):
         exts = self._walk_extensions()
         primary_tag = labels[0]
-        paths = list(shared.walk_files(outdir, allowed_extensions=exts))
-        paths.sort(
+        top_paths = heapq.nlargest(
+            max_items,
+            shared.walk_files(outdir, allowed_extensions=exts),
             key=lambda p: self.lister.mctime(p)[0] or 0,
-            reverse=True,
         )
-        paths = paths[:max_items]
-        for path in paths:
+        for path in top_paths:
             abspath = os.path.abspath(path)
             relpath = os.path.relpath(abspath, outdir).replace("\\", "/")
             yield abspath, outdir, primary_tag, labels, relpath

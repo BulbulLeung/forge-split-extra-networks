@@ -6,6 +6,7 @@ from typing import Any, List, Optional
 
 import gradio as gr
 from fastapi import FastAPI, HTTPException
+from PIL import Image
 from pydantic import BaseModel
 
 from modules import images, infotext_utils, script_callbacks, ui_extra_networks
@@ -172,11 +173,15 @@ def build_field_updates_from_info(
 def build_field_updates(
     tabname: str, filepath: str
 ) -> tuple[Optional[str], list[dict], Optional[str]]:
-    image = images.read(filepath)
-    info, _ = images.read_info_from_image(image)
+    info, _ = read_png_info(filepath)
     if not info:
         return None, [], "No PNG info in image"
     return _collect_field_updates(tabname, info)
+
+
+def read_png_info(filepath: str) -> tuple[Optional[str], Any]:
+    with Image.open(filepath) as image:
+        return images.read_info_from_image(image)
 
 
 def _apply_response(
@@ -207,8 +212,7 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
         path = validate_output_file(filename)
 
         try:
-            image = images.read(str(path))
-            info, _ = images.read_info_from_image(image)
+            info, _ = await asyncio.to_thread(read_png_info, str(path))
         except Exception as e:
             return {"info": None, "error": str(e)}
 
@@ -216,6 +220,18 @@ def register_output_browser_routes(_: gr.Blocks, app: FastAPI):
             return {"info": None, "error": "No PNG info in image"}
 
         return {"info": info, "error": None}
+
+    @app.get("/forge-en-output-browser/exists")
+    async def output_file_exists(filename: str = ""):
+        if not filename:
+            raise HTTPException(status_code=400, detail="filename required")
+        try:
+            validate_output_file(filename)
+            return {"exists": True, "error": None}
+        except HTTPException as ex:
+            if ex.status_code == 404:
+                return {"exists": False, "error": None}
+            raise
 
     @app.post("/forge-en-output-browser/delete")
     async def delete_files(req: DeleteRequest):

@@ -71,15 +71,22 @@ class ExtraNetworksPageWildcard(ui_extra_networks.ExtraNetworksPage):
             return ""
 
         subdirs: dict[str, int] = {}
-        for root, dirs, _ in sorted(
+        walk_rows = sorted(
             os.walk(parentdir, followlinks=True),
             key=lambda x: shared.natural_sort_key(x[0]),
-        ):
+        )
+        non_empty_dirs = {
+            os.path.abspath(root)
+            for root, _dirs, files in walk_rows
+            if any(not filename.startswith(".") for filename in files)
+        }
+
+        for root, dirs, _files in walk_rows:
             for dirname in sorted(dirs, key=shared.natural_sort_key):
                 path = os.path.join(root, dirname)
                 if not os.path.isdir(path):
                     continue
-                if len(os.listdir(path)) == 0:
+                if os.path.abspath(path) not in non_empty_dirs:
                     continue
 
                 rel = os.path.relpath(path, parentdir).replace("\\", "/")

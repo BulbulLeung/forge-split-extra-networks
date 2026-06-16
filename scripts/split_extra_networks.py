@@ -11,16 +11,6 @@ for _path in (_EXT_DIR, _SCRIPTS_DIR):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-_EXT_JS_DIR = os.path.join(_EXT_DIR, "javascript")
-_EXT_JS_FILES = (
-    "split_extra_networks.js",
-    "output_browser.js",
-    "enabled_filter.js",
-    "wildcard.js",
-    "lora.js",
-    "prompt.js",
-)
-
 _FORGE_EN_TAB_CHOICES = [
     "output_browser",
     "prompt",
@@ -227,31 +217,6 @@ def _apply_extra_networks_tab_order():
         shared.opts.ui_extra_networks_tab_reorder = order
 
 
-def _ensure_js_in_javascript_html():
-    """Ensure extension JS is included in the page head."""
-    import modules.ui_gradio_extensions as uge
-
-    if getattr(uge, "_forge_split_js_patched", False):
-        return
-
-    uge._forge_split_js_patched = True
-    original = uge.javascript_html
-
-    def wrapped_javascript_html():
-        html = original()
-        for js_name in _EXT_JS_FILES:
-            if js_name in html:
-                continue
-            js_path = os.path.normpath(os.path.join(_EXT_JS_DIR, js_name))
-            if os.path.isfile(js_path):
-                html += (
-                    f'<script type="text/javascript" src="{uge.webpath(js_path)}"></script>\n'
-                )
-        return html
-
-    uge.javascript_html = wrapped_javascript_html
-
-
 def _register_output_browser():
     if not shared.opts.forge_en_output_browser_enabled:
         return
@@ -277,7 +242,6 @@ def _register_prompt():
 
 
 def _on_before_ui():
-    _ensure_js_in_javascript_html()
     _apply_extra_networks_tab_order()
     _register_output_browser()
     _register_wildcard()

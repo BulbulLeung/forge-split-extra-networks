@@ -26,6 +26,7 @@ const FORGE_EN_PROMPT_DROP_LINE_CLASS = "forge-en-prompt-drop-line";
 const FORGE_EN_PROMPT_TAGS_CLASS_DRAGGING = "forge-en-prompt-tags--dragging";
 const FORGE_EN_PROMPT_HISTORY_LIMIT = 16;
 const FORGE_EN_PROMPT_HISTORY_DELAY_MS = 600;
+const FORGE_EN_PROMPT_SYNC_DEBOUNCE_MS = 80;
 const FORGE_EN_LOCAL_AI_CONNECT_ERROR = "Local AI connect error";
 const FORGE_EN_PROMPT_TOOLTIP_DEBOUNCE_MS = 150;
 const FORGE_EN_PROMPT_SELECTED_CLASS = "forge-en-output-selected";
@@ -60,6 +61,8 @@ let forgeEnPromptDragState = null;
 let forgeEnPromptDragSuppressClick = false;
 const forgeEnPromptHistoryByTextarea = new WeakMap();
 const forgeEnPromptHistoryEditTimers = new WeakMap();
+const forgeEnPromptSyncTimers = Object.create(null);
+const forgeEnPromptLastSyncedText = Object.create(null);
 
 function forgeEnPromptHistoryEnabled() {
     return true;
@@ -296,6 +299,7 @@ function forgeEnPromptEnsureTagsContainer(tabname) {
 
     if (forgeEnPromptBound.tags[tabname] !== container) {
         delete forgeEnPromptBound.tags[tabname];
+        delete forgeEnPromptLastSyncedText[tabname];
         forgeEnPromptBindTagsContainers();
     }
 
@@ -2154,6 +2158,20 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         return;
     }
 
+    const currentText = textarea ? textarea.value || "" : "";
+    const hasAddButton = !!container.querySelector(
+        "." + FORGE_EN_PROMPT_ADD_CLASS
+    );
+    if (
+        !forceSync &&
+        forgeEnPromptLastSyncedText[tabname] === currentText &&
+        !container.dataset.forgeEnPendingSelection &&
+        hasAddButton
+    ) {
+        return;
+    }
+    forgeEnPromptLastSyncedText[tabname] = currentText;
+
     const pendingRaw = container.dataset.forgeEnPendingSelection;
     let selectedIndices;
     if (pendingRaw !== undefined && pendingRaw !== "") {
@@ -2168,7 +2186,7 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
     } else {
         selectedIndices = new Set(forgeEnPromptGetSelectedIndices(container));
     }
-    const parts = forgeEnPromptSplitParts(textarea ? textarea.value || "" : "");
+    const parts = forgeEnPromptSplitParts(currentText);
     const fragment = document.createDocumentFragment();
     let lineParts = [];
     let lineIndices = [];
@@ -2272,6 +2290,16 @@ function forgeEnPromptOnPromptActivity(tabname) {
     forgeEnPromptSyncTags(tabname);
 }
 
+function forgeEnPromptScheduleSyncTags(tabname) {
+    if (forgeEnPromptSyncTimers[tabname]) {
+        clearTimeout(forgeEnPromptSyncTimers[tabname]);
+    }
+    forgeEnPromptSyncTimers[tabname] = setTimeout(function () {
+        delete forgeEnPromptSyncTimers[tabname];
+        forgeEnPromptSyncTags(tabname);
+    }, FORGE_EN_PROMPT_SYNC_DEBOUNCE_MS);
+}
+
 function forgeEnPromptBindTextarea(tabname, id, boundKey) {
     const app = gradioApp();
     if (!app) return;
@@ -2284,7 +2312,7 @@ function forgeEnPromptBindTextarea(tabname, id, boundKey) {
     forgeEnPromptBound[boundKey][tabname] = textarea;
     forgeEnPromptHistoryEnsureInitial(textarea);
     textarea.addEventListener("input", function () {
-        forgeEnPromptOnPromptActivity(tabname);
+        forgeEnPromptScheduleSyncTags(tabname);
     });
     textarea.addEventListener("keydown", function (event) {
         if (forgeEnPromptHistoryHandleKeydown(event, tabname)) {
@@ -2627,6 +2655,7 @@ function forgeEnPromptInstallTabSelectHook() {
         if (tabnameFull === forgeEnPromptTabnameFull(tabname)) {
             forgeEnPromptInstallSortGuard(tabname);
             forgeEnPromptHideToolbar(tabname);
+            forgeEnPromptSyncTags(tabname, true);
         } else if (tabnameFull) {
             forgeEnPromptRestoreColumnControls(tabname);
         }

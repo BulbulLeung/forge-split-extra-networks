@@ -7,6 +7,7 @@ const FORGE_EN_WILDCARD_TABNAMES = ["txt2img", "img2img"];
 const FORGE_EN_WILDCARD_ACTIVE_CLASS = "forge-en-wildcard-active";
 const FORGE_EN_WILDCARD_DEFAULT_WRAP = "__";
 const FORGE_EN_WILDCARD_PROMPT_SEPARATOR = ", ";
+const FORGE_EN_WILDCARD_SYNC_DEBOUNCE_MS = 80;
 
 const forgeEnWildcardBound = {
     prompt: Object.create(null),
@@ -16,6 +17,8 @@ const forgeEnWildcardBound = {
 
 let forgeEnWildcardContextMenuEl = null;
 let forgeEnWildcardContextMenuState = null;
+const forgeEnWildcardSyncTimers = Object.create(null);
+const forgeEnWildcardLastPrompt = Object.create(null);
 
 function forgeEnWildcardWrap() {
     if (
@@ -46,17 +49,10 @@ function forgeEnWildcardTabnameFromContainer(container) {
 }
 
 function forgeEnWildcardGetPromptTextarea(tabname) {
-    if (
-        typeof activePromptTextarea !== "undefined" &&
-        activePromptTextarea[tabname]
-    ) {
-        return activePromptTextarea[tabname];
+    if (typeof forgeEnGetPromptTextarea === "function") {
+        return forgeEnGetPromptTextarea(tabname);
     }
-    const app = gradioApp();
-    if (!app) return null;
-    return app.querySelector(
-        "#" + tabname + "_prompt > label > textarea",
-    );
+    return null;
 }
 
 function forgeEnWildcardEscapeRegex(text) {
@@ -344,6 +340,10 @@ function forgeEnWildcardSyncHighlights(tabname) {
 
     const textarea = forgeEnWildcardGetPromptTextarea(tabname);
     const prompt = textarea ? textarea.value || "" : "";
+    if (forgeEnWildcardLastPrompt[tabname] === prompt) {
+        return;
+    }
+    forgeEnWildcardLastPrompt[tabname] = prompt;
 
     container.querySelectorAll(".card").forEach(function (card) {
         const token = forgeEnWildcardTokenFromCard(card);
@@ -365,7 +365,23 @@ function forgeEnWildcardSyncAllHighlights() {
 }
 
 function forgeEnWildcardOnPromptInput(tabname) {
-    forgeEnWildcardSyncHighlights(tabname);
+    if (typeof forgeEnDebounceByKey === "function") {
+        forgeEnDebounceByKey(
+            "wildcard_sync_" + tabname,
+            FORGE_EN_WILDCARD_SYNC_DEBOUNCE_MS,
+            function () {
+                forgeEnWildcardSyncHighlights(tabname);
+            },
+        );
+        return;
+    }
+    if (forgeEnWildcardSyncTimers[tabname]) {
+        clearTimeout(forgeEnWildcardSyncTimers[tabname]);
+    }
+    forgeEnWildcardSyncTimers[tabname] = setTimeout(function () {
+        delete forgeEnWildcardSyncTimers[tabname];
+        forgeEnWildcardSyncHighlights(tabname);
+    }, FORGE_EN_WILDCARD_SYNC_DEBOUNCE_MS);
 }
 
 function forgeEnWildcardBindPromptListeners() {
