@@ -14,6 +14,11 @@ _QWEN_THINKING_PREFILL = "<think>\n\n</think>\n\n"
 _SD_LORA_RE = re.compile(r"<lora:[^:>]+:[\d.]+>", re.I)
 _SD_LORA_NEG_RE = re.compile(r"\(lora:[^:)]+:[\d.]+\)", re.I)
 _SD_WEIGHT_RE = re.compile(r"\([^()]+:\d+\.?\d*\)")
+_SD_WEIGHT_SINGLE_EXPLICIT_RE = re.compile(r"^\((.+):([\d.]+)\)$")
+_SD_WEIGHT_SINGLE_IMPLICIT_RE = re.compile(r"^\((.+)\)$")
+_SD_WEIGHT_OPEN_RE = re.compile(r"^\((.+)$")
+_SD_WEIGHT_CLOSE_EXPLICIT_RE = re.compile(r"^(.+):([\d.]+)\)$")
+_SD_WEIGHT_CLOSE_IMPLICIT_RE = re.compile(r"^(.+)\)$")
 _SD_BREAK_RE = re.compile(r"\bBREAK\b", re.I)
 _SD_PROT_FMT = "\u27e6SDPROT{index}\u27e7"
 _SD_PROT_RE = re.compile(r"\u27e6SDPROT(\d+)\u27e7")
@@ -172,6 +177,37 @@ def _translate_tooltip_chunk(chunk: str, lang: str) -> str:
         return chunk
     raw = call_local_ai(_sd_tooltip_system(lang), stripped, max_tokens=32)
     return _clean_tooltip_translation(raw, stripped)
+
+
+def _translate_weight_syntax_part(
+    text: str,
+    translate_inner,
+) -> str | None:
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+
+    match = _SD_WEIGHT_SINGLE_EXPLICIT_RE.fullmatch(stripped)
+    if match:
+        return f"({translate_inner(match.group(1))}:{match.group(2)})"
+
+    match = _SD_WEIGHT_SINGLE_IMPLICIT_RE.fullmatch(stripped)
+    if match:
+        return f"({translate_inner(match.group(1))})"
+
+    match = _SD_WEIGHT_CLOSE_EXPLICIT_RE.fullmatch(stripped)
+    if match:
+        return f"{translate_inner(match.group(1))}:{match.group(2)})"
+
+    match = _SD_WEIGHT_CLOSE_IMPLICIT_RE.fullmatch(stripped)
+    if match:
+        return f"{translate_inner(match.group(1))})"
+
+    match = _SD_WEIGHT_OPEN_RE.fullmatch(stripped)
+    if match and not stripped.endswith(")"):
+        return f"({translate_inner(match.group(1))}"
+
+    return None
 
 
 def _translate_masked_segments(masked: str, tokens: list[str], lang: str) -> str:
@@ -396,8 +432,16 @@ def _is_wildcard_part(text: str) -> bool:
 def translate_for_tooltip(text: str) -> str:
     if _is_lora_part(text) or _is_wildcard_part(text):
         return ""
-    masked, tokens = _mask_sd_syntax(text)
     lang = _translate_lang()
+
+    def translate_inner(inner: str) -> str:
+        return _translate_tooltip_chunk(inner, lang)
+
+    weighted = _translate_weight_syntax_part(text, translate_inner)
+    if weighted is not None:
+        return _clean_tooltip_translation(weighted, text)
+
+    masked, tokens = _mask_sd_syntax(text)
     result = _translate_masked_segments(masked, tokens, lang)
     return _clean_tooltip_translation(result, text)
 
@@ -425,6 +469,14 @@ def process_insert_text(text: str) -> dict[str, Any]:
             sentence, [p.strip() for p in raw.split(",") if p.strip()]
         )
         return {"text": None, "parts": parts, "error": None}
+
+    weighted = _translate_weight_syntax_part(trimmed, _translate_insert_chunk)
+    if weighted is not None:
+        return {
+            "text": _clean_tooltip_translation(weighted, trimmed),
+            "parts": None,
+            "error": None,
+        }
 
     masked, tokens = _mask_sd_syntax(trimmed)
     return {
