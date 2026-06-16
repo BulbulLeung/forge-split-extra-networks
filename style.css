@@ -920,6 +920,28 @@
     border-color: transparent;
 }
 
+#txt2img_en_prompt_pane .forge-en-prompt-tag__paren,
+#img2img_en_prompt_pane .forge-en-prompt-tag__paren {
+    color: #f5d442;
+    font-weight: 600;
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag__paren,
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag__paren {
+    color: #ffe566;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag__paren-unclosed,
+#img2img_en_prompt_pane .forge-en-prompt-tag__paren-unclosed {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag__paren-unclosed,
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag__paren-unclosed {
+    color: #ff6b6b;
+}
+
 .forge-en-prompt-insert-popover {
     display: none;
     position: fixed;

@@ -17,6 +17,9 @@ const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
 const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+>$/i;
 const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+\)$/i;
+const FORGE_EN_PROMPT_TAG_CLASS_PAREN = "forge-en-prompt-tag__paren";
+const FORGE_EN_PROMPT_TAG_CLASS_PAREN_UNCLOSED =
+    "forge-en-prompt-tag__paren-unclosed";
 const FORGE_EN_PROMPT_DRAG_THRESHOLD_PX = 6;
 const FORGE_EN_PROMPT_TAG_CLASS_DRAGGING = "forge-en-prompt-tag--dragging";
 const FORGE_EN_PROMPT_DROP_LINE_CLASS = "forge-en-prompt-drop-line";
@@ -398,6 +401,114 @@ function forgeEnPromptTagTypeClass(part) {
         return FORGE_EN_PROMPT_TAG_CLASS_BREAK;
     }
     return "";
+}
+
+function forgeEnPromptEscapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function forgeEnPromptAnalyzeParenLine(parts) {
+    const styles = parts.map(function (part) {
+        const arr = new Array(part.length);
+        for (let i = 0; i < part.length; i++) {
+            arr[i] = "normal";
+        }
+        return arr;
+    });
+
+    let depth = 0;
+    let openAnchor = null;
+
+    for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        for (let i = 0; i < part.length; i++) {
+            const ch = part[i];
+            if (ch === "(") {
+                depth++;
+                if (depth === 1) {
+                    openAnchor = { partIdx: p, charIdx: i };
+                }
+                styles[p][i] = "yellow";
+            } else if (ch === ")") {
+                if (depth > 0) {
+                    styles[p][i] = "yellow";
+                    depth--;
+                    if (depth === 0) {
+                        openAnchor = null;
+                    }
+                } else {
+                    styles[p][i] = "unclosed";
+                }
+            } else if (depth > 0) {
+                styles[p][i] = "yellow";
+            }
+        }
+    }
+
+    if (depth > 0 && openAnchor !== null) {
+        const startP = openAnchor.partIdx;
+        const startI = openAnchor.charIdx;
+        for (let p = startP; p < parts.length; p++) {
+            const from = p === startP ? startI : 0;
+            for (let i = from; i < parts[p].length; i++) {
+                if (styles[p][i] === "yellow") {
+                    styles[p][i] = "unclosed";
+                }
+            }
+        }
+    }
+
+    return styles;
+}
+
+function forgeEnPromptBuildTagLabelFromStyles(part, styles) {
+    let html = "";
+    let buf = "";
+    let bufStyle = null;
+
+    function flush() {
+        if (!buf) return;
+        if (bufStyle === "normal") {
+            html += forgeEnPromptEscapeHtml(buf);
+        } else {
+            const cls =
+                bufStyle === "unclosed"
+                    ? FORGE_EN_PROMPT_TAG_CLASS_PAREN_UNCLOSED
+                    : FORGE_EN_PROMPT_TAG_CLASS_PAREN;
+            html +=
+                '<span class="' +
+                cls +
+                '">' +
+                forgeEnPromptEscapeHtml(buf) +
+                "</span>";
+        }
+        buf = "";
+    }
+
+    for (let i = 0; i < part.length; i++) {
+        const style = styles[i];
+        if (buf && style !== bufStyle) {
+            flush();
+        }
+        bufStyle = style;
+        buf += part[i];
+    }
+    flush();
+    return html;
+}
+
+function forgeEnPromptPartNeedsParenHtml(styles) {
+    for (let i = 0; i < styles.length; i++) {
+        if (styles[i] !== "normal") {
+            return true;
+        }
+    }
+    return false;
 }
 
 function forgeEnPromptApplyTextarea(tabname, textarea, text) {
@@ -1736,8 +1847,10 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
     }
     const parts = forgeEnPromptSplitParts(textarea ? textarea.value || "" : "");
     const fragment = document.createDocumentFragment();
+    let lineParts = [];
+    let lineIndices = [];
 
-    parts.forEach(function (part, index) {
+    function forgeEnPromptAppendTagButton(part, index, partStyles) {
         const button = document.createElement("button");
         button.type = "button";
         const typeClass = forgeEnPromptTagTypeClass(part);
@@ -1749,14 +1862,56 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         if (selectedIndices.has(index)) {
             button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
         }
-        if (forgeEnPromptIsNewlinePart(part)) {
-            button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
+        button.dataset.promptText = part;
+        if (forgeEnPromptPartNeedsParenHtml(partStyles)) {
+            button.innerHTML = forgeEnPromptBuildTagLabelFromStyles(
+                part,
+                partStyles,
+            );
         } else {
-            button.dataset.promptText = part;
             button.textContent = part;
         }
         fragment.appendChild(button);
+    }
+
+    function forgeEnPromptFlushParenLine() {
+        if (lineParts.length === 0) {
+            return;
+        }
+        const styles = forgeEnPromptAnalyzeParenLine(lineParts);
+        for (let i = 0; i < lineParts.length; i++) {
+            forgeEnPromptAppendTagButton(
+                lineParts[i],
+                lineIndices[i],
+                styles[i],
+            );
+        }
+        lineParts = [];
+        lineIndices = [];
+    }
+
+    parts.forEach(function (part, index) {
+        if (forgeEnPromptIsNewlinePart(part)) {
+            forgeEnPromptFlushParenLine();
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className =
+                "lg secondary gradio-button custom-button " +
+                FORGE_EN_PROMPT_TAG_CLASS +
+                " " +
+                FORGE_EN_PROMPT_TAG_CLASS_NEWLINE;
+            button.dataset.index = String(index);
+            if (selectedIndices.has(index)) {
+                button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+            }
+            button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
+            fragment.appendChild(button);
+            return;
+        }
+        lineParts.push(part);
+        lineIndices.push(index);
     });
+    forgeEnPromptFlushParenLine();
 
     const addButton = document.createElement("button");
     addButton.type = "button";
