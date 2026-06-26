@@ -217,13 +217,6 @@ function forgeEnLoraLineContainsLora(line, loraKey) {
     return new RegExp(forgeEnLoraBuildTokenPattern(loraKey)).test(line || "");
 }
 
-function forgeEnLoraGetLineIndexForPos(text, pos) {
-    if (pos <= 0) {
-        return 0;
-    }
-    return text.slice(0, pos).split("\n").length - 1;
-}
-
 function forgeEnLoraRemoveFromLine(line, loraKey, activationText) {
     if (!forgeEnLoraLineContainsLora(line, loraKey)) {
         return {
@@ -276,92 +269,6 @@ function forgeEnLoraRemoveFromLine(line, loraKey, activationText) {
     };
 }
 
-function forgeEnLoraMapCaretInLine(
-    oldLine,
-    newLine,
-    posInLine,
-    removedStart,
-    removedEnd,
-) {
-    if (removedStart < 0) {
-        return Math.min(Math.max(0, posInLine), newLine.length);
-    }
-
-    if (posInLine >= oldLine.length) {
-        return newLine.length;
-    }
-
-    let pos = posInLine;
-    if (pos <= removedStart) {
-        pos = posInLine;
-    } else if (pos >= removedEnd) {
-        pos -= removedEnd - removedStart;
-    } else {
-        pos = removedStart;
-    }
-
-    return Math.max(0, Math.min(pos, newLine.length));
-}
-
-function forgeEnLoraFindLoraLine(lines, loraKey, cursorLine) {
-    let fallbackLine = -1;
-
-    for (let i = 0; i < lines.length; i++) {
-        if (!forgeEnLoraLineContainsLora(lines[i], loraKey)) {
-            continue;
-        }
-        if (i === cursorLine) {
-            return i;
-        }
-        if (fallbackLine < 0) {
-            fallbackLine = i;
-        }
-    }
-
-    return fallbackLine;
-}
-
-function forgeEnLoraMapSelectionAfterRemove(
-    lines,
-    processed,
-    selectionPos,
-    tokenLine,
-    cursorLine,
-) {
-    let oldPos = 0;
-    let newPos = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-        const oldLine = lines[i];
-        const entry = processed[i];
-        const newLine = entry.line;
-
-        if (i === tokenLine) {
-            const posInLine =
-                cursorLine === tokenLine
-                    ? selectionPos - oldPos
-                    : entry.removedStart >= 0
-                      ? entry.removedStart
-                      : 0;
-            return (
-                newPos +
-                forgeEnLoraMapCaretInLine(
-                    oldLine,
-                    newLine,
-                    posInLine,
-                    entry.removedStart,
-                    entry.removedEnd,
-                )
-            );
-        }
-
-        oldPos += oldLine.length + (i < lines.length - 1 ? 1 : 0);
-        newPos += newLine.length + (i < processed.length - 1 ? 1 : 0);
-    }
-
-    return newPos;
-}
-
 function forgeEnLoraRemoveLoraFromPromptWithCaret(
     prompt,
     loraKey,
@@ -369,6 +276,25 @@ function forgeEnLoraRemoveLoraFromPromptWithCaret(
     selectionEnd,
     activationText,
 ) {
+    const api = window.genLayoutPromptCaret;
+    if (api) {
+        return api.removeLinesWithCaret(prompt, selectionStart, selectionEnd, {
+            promptContains: function (text) {
+                return forgeEnLoraPromptContainsLora(text, loraKey);
+            },
+            lineContains: function (line) {
+                return forgeEnLoraLineContainsLora(line, loraKey);
+            },
+            removeFromLine: function (line) {
+                return forgeEnLoraRemoveFromLine(
+                    line,
+                    loraKey,
+                    activationText || "",
+                );
+            },
+        });
+    }
+
     if (!forgeEnLoraPromptContainsLora(prompt, loraKey)) {
         return {
             text: prompt,
@@ -377,17 +303,8 @@ function forgeEnLoraRemoveLoraFromPromptWithCaret(
         };
     }
 
-    const normalized = prompt.replace(/\r\n/g, "\n");
-    const lines = normalized.split("\n");
-    const cursorLine = forgeEnLoraGetLineIndexForPos(
-        normalized,
-        selectionStart,
-    );
-    const tokenLine = forgeEnLoraFindLoraLine(lines, loraKey, cursorLine);
-    const suffix = activationText || "";
-
-    const processed = lines.map(function (line) {
-        return forgeEnLoraRemoveFromLine(line, loraKey, suffix);
+    const processed = (prompt || "").split("\n").map(function (line) {
+        return forgeEnLoraRemoveFromLine(line, loraKey, activationText || "");
     });
     const text = processed
         .map(function (entry) {
@@ -395,31 +312,10 @@ function forgeEnLoraRemoveLoraFromPromptWithCaret(
         })
         .join("\n");
 
-    let caret = forgeEnLoraMapSelectionAfterRemove(
-        lines,
-        processed,
-        selectionStart,
-        tokenLine,
-        cursorLine,
-    );
-    let caretEnd = forgeEnLoraMapSelectionAfterRemove(
-        lines,
-        processed,
-        selectionEnd,
-        tokenLine,
-        cursorLine,
-    );
-
-    caret = Math.max(0, Math.min(caret, text.length));
-    caretEnd = Math.max(0, Math.min(caretEnd, text.length));
-    if (caretEnd < caret) {
-        caretEnd = caret;
-    }
-
     return {
         text: text,
-        caret: caret,
-        caretEnd: caretEnd,
+        caret: selectionStart,
+        caretEnd: selectionEnd,
     };
 }
 
@@ -450,14 +346,24 @@ function forgeEnLoraRemoveWithCaret(tabname, loraKey, card) {
         activationText,
     );
 
-    textarea.value = result.text;
-    textarea.focus();
-    textarea.selectionStart = result.caret;
-    textarea.selectionEnd = result.caretEnd;
-
-    if (typeof updateInput === "function") {
-        updateInput(textarea);
+    const api = window.genLayoutPromptCaret;
+    if (api) {
+        api.applyEdit(textarea, {
+            value: result.text,
+            caret: result.caret,
+            caretEnd: result.caretEnd,
+            scroll: "none",
+        });
+    } else {
+        textarea.value = result.text;
+        textarea.focus();
+        textarea.selectionStart = result.caret;
+        textarea.selectionEnd = result.caretEnd;
+        if (typeof updateInput === "function") {
+            updateInput(textarea);
+        }
     }
+
     if (
         tabname === "txt2img" &&
         typeof recalculate_prompts_txt2img === "function"

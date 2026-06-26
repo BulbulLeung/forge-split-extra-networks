@@ -358,6 +358,13 @@ function forgeEnPromptJoinParts(parts) {
     return lines.join("\n");
 }
 
+function forgeEnPromptOffsetForPartsPrefix(parts, count) {
+    if (!parts || count <= 0) {
+        return 0;
+    }
+    return forgeEnPromptJoinParts(parts.slice(0, count)).length;
+}
+
 function forgeEnPromptGetWildcardWrap() {
     if (typeof forgeEnWildcardWrap === "function") {
         return forgeEnWildcardWrap();
@@ -834,13 +841,28 @@ function forgeEnPromptPartNeedsParenHtml(styles) {
     return false;
 }
 
-function forgeEnPromptApplyTextarea(tabname, textarea, text) {
+function forgeEnPromptApplyTextarea(tabname, textarea, text, caretOpts) {
     if (!textarea || textarea.value === text) return;
     forgeEnPromptHistorySnapshot(textarea);
-    textarea.value = text;
-    if (typeof updateInput === "function") {
-        updateInput(textarea);
+
+    const api = window.genLayoutPromptCaret;
+    if (api && caretOpts && typeof caretOpts.caret === "number") {
+        api.applyEdit(textarea, {
+            value: text,
+            caret: caretOpts.caret,
+            caretEnd:
+                typeof caretOpts.caretEnd === "number"
+                    ? caretOpts.caretEnd
+                    : caretOpts.caret,
+            scroll: caretOpts.scroll || "none",
+        });
+    } else {
+        textarea.value = text;
+        if (typeof updateInput === "function") {
+            updateInput(textarea);
+        }
     }
+
     if (
         tabname === "txt2img" &&
         typeof recalculate_prompts_txt2img === "function"
@@ -862,7 +884,13 @@ function forgeEnPromptInsertNewlineAfter(tabname, index) {
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     const insertAt = Math.min(Math.max(0, index + 1), parts.length);
     parts.splice(insertAt, 0, FORGE_EN_PROMPT_NEWLINE_MARKER);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "caretLineIfNeeded" },
+    );
 }
 
 function forgeEnPromptInsertAfter(tabname, index, newText) {
@@ -880,7 +908,13 @@ function forgeEnPromptInsertAfter(tabname, index, newText) {
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     const insertAt = Math.min(Math.max(0, index + 1), parts.length);
     parts.splice(insertAt, 0, trimmed);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
 }
 
 function forgeEnPromptRemoveAt(tabname, index) {
@@ -892,8 +926,14 @@ function forgeEnPromptRemoveAt(tabname, index) {
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     if (index < 0 || index >= parts.length) return;
 
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, index);
     parts.splice(index, 1);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
 }
 
 function forgeEnPromptSelectionOutlinePx() {
@@ -1071,6 +1111,14 @@ function forgeEnPromptRemoveIndices(tabname, indices) {
         }
     });
 
+    const removeAt = Math.min.apply(
+        Math,
+        unique.slice().sort(function (a, b) {
+            return a - b;
+        }),
+    );
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, removeAt);
+
     unique.forEach(function (index) {
         parts.splice(index, 1);
     });
@@ -1081,7 +1129,12 @@ function forgeEnPromptRemoveIndices(tabname, indices) {
         delete container.dataset.forgeEnAnchorIndex;
     }
 
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
 }
 
 function forgeEnPromptIsEditableTarget(target) {
@@ -1280,14 +1333,27 @@ function forgeEnPromptUpdateAt(tabname, index, newText) {
     if (index < 0 || index >= parts.length) return;
 
     const trimmed = (newText || "").trim();
+    let caret;
+    let scroll = "none";
+
     if (!trimmed) {
+        caret = forgeEnPromptOffsetForPartsPrefix(parts, index);
         parts.splice(index, 1);
     } else if (trimmed === "\\n") {
         parts[index] = FORGE_EN_PROMPT_NEWLINE_MARKER;
+        caret = forgeEnPromptOffsetForPartsPrefix(parts, index + 1);
+        scroll = "caretLineIfNeeded";
     } else {
         parts[index] = trimmed;
+        caret = forgeEnPromptOffsetForPartsPrefix(parts, index + 1);
     }
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: scroll },
+    );
 }
 
 function forgeEnPromptGetInsertAt(fromIndex, toIndex, insertBefore) {
@@ -1310,7 +1376,13 @@ function forgeEnPromptMoveBefore(tabname, fromIndex, toIndex) {
 
     const item = parts.splice(fromIndex, 1)[0];
     parts.splice(insertAt, 0, item);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
 }
 
 function forgeEnPromptMoveAfter(tabname, fromIndex, toIndex) {
@@ -1326,7 +1398,13 @@ function forgeEnPromptMoveAfter(tabname, fromIndex, toIndex) {
 
     const item = parts.splice(fromIndex, 1)[0];
     parts.splice(insertAt, 0, item);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
 }
 
 function forgeEnPromptNormalizeSortedIndices(indices) {
@@ -1405,7 +1483,16 @@ function forgeEnPromptMoveBlock(
         return clampedInsert + offset;
     });
     forgeEnPromptSetPendingSelection(container, newSelection);
-    forgeEnPromptApplyTextarea(tabname, textarea, forgeEnPromptJoinParts(parts));
+    const caret = forgeEnPromptOffsetForPartsPrefix(
+        parts,
+        clampedInsert + block.length,
+    );
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
     return clampedInsert;
 }
 
@@ -1902,10 +1989,15 @@ function forgeEnPromptInsertMultipleAfter(tabname, index, texts) {
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     const insertAt = Math.min(Math.max(0, index + 1), parts.length);
     parts.splice(insertAt, 0, ...toInsert);
+    const caret = forgeEnPromptOffsetForPartsPrefix(
+        parts,
+        insertAt + toInsert.length,
+    );
     forgeEnPromptApplyTextarea(
         tabname,
         textarea,
         forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
     );
 }
 

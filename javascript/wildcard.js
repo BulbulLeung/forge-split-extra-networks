@@ -67,13 +67,6 @@ function forgeEnWildcardPromptContainsToken(prompt, token) {
     return prompt.indexOf(token) >= 0;
 }
 
-function forgeEnWildcardGetLineIndexForPos(text, pos) {
-    if (pos <= 0) {
-        return 0;
-    }
-    return text.slice(0, pos).split("\n").length - 1;
-}
-
 function forgeEnWildcardRemoveTokenFromLine(line, token) {
     if (!forgeEnWildcardPromptContainsToken(line, token)) {
         return {
@@ -115,98 +108,22 @@ function forgeEnWildcardRemoveTokenFromLine(line, token) {
     };
 }
 
-function forgeEnWildcardMapCaretInLine(
-    oldLine,
-    newLine,
-    posInLine,
-    removedStart,
-    removedEnd,
-) {
-    if (removedStart < 0) {
-        return Math.min(Math.max(0, posInLine), newLine.length);
-    }
-
-    if (posInLine >= oldLine.length) {
-        return newLine.length;
-    }
-
-    let pos = posInLine;
-    if (pos <= removedStart) {
-        pos = posInLine;
-    } else if (pos >= removedEnd) {
-        pos -= removedEnd - removedStart;
-    } else {
-        pos = removedStart;
-    }
-
-    return Math.max(0, Math.min(pos, newLine.length));
-}
-
-function forgeEnWildcardFindTokenLine(lines, token, cursorLine) {
-    let fallbackLine = -1;
-
-    for (let i = 0; i < lines.length; i++) {
-        if (!forgeEnWildcardPromptContainsToken(lines[i], token)) {
-            continue;
-        }
-        if (i === cursorLine) {
-            return i;
-        }
-        if (fallbackLine < 0) {
-            fallbackLine = i;
-        }
-    }
-
-    return fallbackLine;
-}
-
-function forgeEnWildcardMapSelectionAfterRemove(
-    lines,
-    processed,
-    selectionPos,
-    tokenLine,
-    cursorLine,
-) {
-    let oldPos = 0;
-    let newPos = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-        const oldLine = lines[i];
-        const entry = processed[i];
-        const newLine = entry.line;
-
-        if (i === tokenLine) {
-            const posInLine =
-                cursorLine === tokenLine
-                    ? selectionPos - oldPos
-                    : entry.removedStart >= 0
-                      ? entry.removedStart
-                      : 0;
-            return (
-                newPos +
-                forgeEnWildcardMapCaretInLine(
-                    oldLine,
-                    newLine,
-                    posInLine,
-                    entry.removedStart,
-                    entry.removedEnd,
-                )
-            );
-        }
-
-        oldPos += oldLine.length + (i < lines.length - 1 ? 1 : 0);
-        newPos += newLine.length + (i < processed.length - 1 ? 1 : 0);
-    }
-
-    return newPos;
-}
-
 function forgeEnWildcardRemoveTokenFromPromptWithCaret(
     prompt,
     token,
     selectionStart,
     selectionEnd,
 ) {
+    const api = window.genLayoutPromptCaret;
+    if (api) {
+        return api.removeWildcardTokenWithCaret(
+            prompt,
+            token,
+            selectionStart,
+            selectionEnd,
+        );
+    }
+
     if (!forgeEnWildcardPromptContainsToken(prompt, token)) {
         return {
             text: prompt,
@@ -215,44 +132,19 @@ function forgeEnWildcardRemoveTokenFromPromptWithCaret(
         };
     }
 
-    const normalized = prompt.replace(/\r\n/g, "\n");
-    const lines = normalized.split("\n");
-    const cursorLine = forgeEnWildcardGetLineIndexForPos(normalized, selectionStart);
-    const tokenLine = forgeEnWildcardFindTokenLine(lines, token, cursorLine);
-
-    const processed = lines.map(function (line) {
+    const processed = (prompt || "").split("\n").map(function (line) {
         return forgeEnWildcardRemoveTokenFromLine(line, token);
     });
-    const newLines = processed.map(function (entry) {
-        return entry.line;
-    });
-    const text = newLines.join("\n");
-
-    let caret = forgeEnWildcardMapSelectionAfterRemove(
-        lines,
-        processed,
-        selectionStart,
-        tokenLine,
-        cursorLine,
-    );
-    let caretEnd = forgeEnWildcardMapSelectionAfterRemove(
-        lines,
-        processed,
-        selectionEnd,
-        tokenLine,
-        cursorLine,
-    );
-
-    caret = Math.max(0, Math.min(caret, text.length));
-    caretEnd = Math.max(0, Math.min(caretEnd, text.length));
-    if (caretEnd < caret) {
-        caretEnd = caret;
-    }
+    const text = processed
+        .map(function (entry) {
+            return entry.line;
+        })
+        .join("\n");
 
     return {
         text: text,
-        caret: caret,
-        caretEnd: caretEnd,
+        caret: selectionStart,
+        caretEnd: selectionEnd,
     };
 }
 
@@ -290,37 +182,62 @@ function forgeEnWildcardAddTokenToPrompt(prompt, token) {
     return result;
 }
 
+function forgeEnWildcardFormatInsert(token) {
+    if (forgeEnWildcardEndsWithComma(token)) {
+        return token;
+    }
+    return token + FORGE_EN_WILDCARD_PROMPT_SEPARATOR;
+}
+
 function forgeEnWildcardToggleToken(tabname, token) {
     const textarea = forgeEnWildcardGetPromptTextarea(tabname);
     if (!textarea || !token) return;
 
     const current = textarea.value || "";
+    const api = window.genLayoutPromptCaret;
+    const selStart =
+        typeof textarea.selectionStart === "number"
+            ? textarea.selectionStart
+            : current.length;
+    const selEnd =
+        typeof textarea.selectionEnd === "number"
+            ? textarea.selectionEnd
+            : selStart;
+
     if (forgeEnWildcardPromptContainsToken(current, token)) {
-        const selStart =
-            typeof textarea.selectionStart === "number"
-                ? textarea.selectionStart
-                : current.length;
-        const selEnd =
-            typeof textarea.selectionEnd === "number"
-                ? textarea.selectionEnd
-                : selStart;
         const result = forgeEnWildcardRemoveTokenFromPromptWithCaret(
             current,
             token,
             selStart,
             selEnd,
         );
-        textarea.value = result.text;
-        textarea.focus();
-        textarea.selectionStart = result.caret;
-        textarea.selectionEnd = result.caretEnd;
+        if (api) {
+            api.applyEdit(textarea, {
+                value: result.text,
+                caret: result.caret,
+                caretEnd: result.caretEnd,
+                scroll: "none",
+            });
+        } else {
+            textarea.value = result.text;
+            textarea.focus();
+            textarea.selectionStart = result.caret;
+            textarea.selectionEnd = result.caretEnd;
+            if (typeof updateInput === "function") {
+                updateInput(textarea);
+            }
+        }
+    } else if (api) {
+        api.insertAtContext(textarea, forgeEnWildcardFormatInsert(token), {
+            scroll: "none",
+        });
     } else {
         textarea.value = forgeEnWildcardAddTokenToPrompt(current, token);
+        if (typeof updateInput === "function") {
+            updateInput(textarea);
+        }
     }
 
-    if (typeof updateInput === "function") {
-        updateInput(textarea);
-    }
     if (tabname === "txt2img" && typeof recalculate_prompts_txt2img === "function") {
         recalculate_prompts_txt2img();
     } else if (
@@ -418,14 +335,7 @@ function forgeEnWildcardBindCardContainers() {
         if (!container || forgeEnWildcardBound.cards[tabname] === container) {
             return;
         }
-
         forgeEnWildcardBound.cards[tabname] = container;
-        container.addEventListener("click", function (event) {
-            const card = event.target.closest(".card");
-            if (!card || !container.contains(card)) return;
-            if (event.target.closest(".button-row")) return;
-            forgeEnWildcardCardClicked(card, event);
-        });
     });
 }
 
@@ -459,11 +369,24 @@ function forgeEnWildcardAddLineToPrompt(tabname, line) {
     }
 
     const current = (textarea.value || "").trimEnd();
-    textarea.value = current ? current + "\n" + lineWithSep : lineWithSep;
+    const newValue = current ? current + "\n" + lineWithSep : lineWithSep;
+    const caret = newValue.length;
+    const api = window.genLayoutPromptCaret;
 
-    if (typeof updateInput === "function") {
-        updateInput(textarea);
+    if (api) {
+        api.applyEdit(textarea, {
+            value: newValue,
+            caret: caret,
+            caretEnd: caret,
+            scroll: "caretLineIfNeeded",
+        });
+    } else {
+        textarea.value = newValue;
+        if (typeof updateInput === "function") {
+            updateInput(textarea);
+        }
     }
+
     if (tabname === "txt2img" && typeof recalculate_prompts_txt2img === "function") {
         recalculate_prompts_txt2img();
     } else if (
@@ -721,22 +644,6 @@ function forgeEnWildcardBindContextMenu() {
             forgeEnWildcardShowContextMenu(event, container, tabname);
         });
     });
-}
-
-function forgeEnWildcardCardClicked(card, event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    const container = card.closest('[id$="_wildcard_cards"]');
-    const tabname = forgeEnWildcardTabnameFromContainer(container);
-    const token = forgeEnWildcardTokenFromCard(card);
-    if (!tabname || !token) return false;
-
-    forgeEnWildcardToggleToken(tabname, token);
-    forgeEnWildcardSyncHighlights(tabname);
-    return false;
 }
 
 function forgeEnWildcardInit() {

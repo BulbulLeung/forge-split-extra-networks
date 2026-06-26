@@ -1031,6 +1031,21 @@ function forgeEnOutputBrowserApplyGradioUpdate(update) {
         input.value = String(update.value);
     }
 
+    const isPromptTextarea =
+        input.tagName === "TEXTAREA" &&
+        /_(prompt|neg_prompt)$/.test(String(update.id || root.id || ""));
+
+    const api = window.genLayoutPromptCaret;
+    if (isPromptTextarea && api) {
+        api.applyEdit(input, {
+            value: input.value,
+            caret: input.value.length,
+            caretEnd: input.value.length,
+            scroll: "none",
+        });
+        return true;
+    }
+
     if (typeof updateInput === "function") {
         updateInput(input);
     } else {
