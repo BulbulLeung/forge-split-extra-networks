@@ -920,6 +920,41 @@
     border-color: transparent;
 }
 
+#txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected) {
+    background-color: #ffffff;
+    border-color: rgba(0, 0, 0, 0.25);
+    color: #000000;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected):hover {
+    background-color: #f5f5f5;
+    border-color: rgba(0, 0, 0, 0.25);
+    color: #000000;
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected),
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected) {
+    background-color: #ffffff;
+    border-color: rgba(0, 0, 0, 0.25);
+    color: #000000;
+}
+
+.dark #txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected):hover,
+.dark #img2img_en_prompt_pane .forge-en-prompt-tag--duplicate:not(.forge-en-output-selected):hover {
+    background-color: #f5f5f5;
+    border-color: rgba(0, 0, 0, 0.25);
+    color: #000000;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate .forge-en-prompt-tag__paren,
+#img2img_en_prompt_pane .forge-en-prompt-tag--duplicate .forge-en-prompt-tag__paren,
+#txt2img_en_prompt_pane .forge-en-prompt-tag--duplicate .forge-en-prompt-tag__paren-unclosed,
+#img2img_en_prompt_pane .forge-en-prompt-tag--duplicate .forge-en-prompt-tag__paren-unclosed {
+    color: #000000;
+}
+
 #txt2img_en_prompt_pane .forge-en-prompt-tag__paren,
 #img2img_en_prompt_pane .forge-en-prompt-tag__paren {
     color: #f5d442;

@@ -14,6 +14,7 @@ const FORGE_EN_PROMPT_TAG_CLASS_BREAK = "forge-en-prompt-tag--break";
 const FORGE_EN_PROMPT_NEWLINE_MARKER = "\u0001";
 const FORGE_EN_PROMPT_NEWLINE_LABEL = "\\n";
 const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
+const FORGE_EN_PROMPT_TAG_CLASS_DUPLICATE = "forge-en-prompt-tag--duplicate";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
 const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+>$/i;
 const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+\)$/i;
@@ -420,6 +421,45 @@ function forgeEnPromptTagTypeClass(part) {
         return FORGE_EN_PROMPT_TAG_CLASS_BREAK;
     }
     return "";
+}
+
+function forgeEnPromptNormalizeTagForDuplicate(part) {
+    if (forgeEnPromptIsNewlinePart(part)) {
+        return null;
+    }
+    const lora = forgeEnPromptParseLoraPart(part);
+    if (lora) {
+        return "lora:" + lora.name.toLowerCase();
+    }
+    if (forgeEnPromptIsWildcardPart(part)) {
+        return part;
+    }
+    if (forgeEnPromptIsBreakPart(part)) {
+        return null;
+    }
+    const closing = forgeEnPromptParseClosingPartWeight(part);
+    if (closing) {
+        return closing.textBefore;
+    }
+    return forgeEnPromptParseWeightedParenPart(part).inner;
+}
+
+function forgeEnPromptBuildDuplicateTagKeys(parts) {
+    const counts = new Map();
+    parts.forEach(function (part) {
+        const key = forgeEnPromptNormalizeTagForDuplicate(part);
+        if (key === null) {
+            return;
+        }
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const duplicates = new Set();
+    counts.forEach(function (count, key) {
+        if (count > 1) {
+            duplicates.add(key);
+        }
+    });
+    return duplicates;
 }
 
 function forgeEnPromptEscapeHtml(text) {
@@ -2279,6 +2319,7 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         selectedIndices = new Set(forgeEnPromptGetSelectedIndices(container));
     }
     const parts = forgeEnPromptSplitParts(currentText);
+    const duplicateKeys = forgeEnPromptBuildDuplicateTagKeys(parts);
     const fragment = document.createDocumentFragment();
     let lineParts = [];
     let lineIndices = [];
@@ -2298,6 +2339,10 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         button.dataset.index = String(index);
         if (selectedIndices.has(index)) {
             button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+        }
+        const dupKey = forgeEnPromptNormalizeTagForDuplicate(part);
+        if (dupKey !== null && duplicateKeys.has(dupKey)) {
+            button.classList.add(FORGE_EN_PROMPT_TAG_CLASS_DUPLICATE);
         }
         button.dataset.promptText = part;
         if (forgeEnPromptPartNeedsParenHtml(partStyles)) {
