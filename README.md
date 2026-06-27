@@ -82,11 +82,13 @@ Keeps **Generation** for **txt2img / img2img** pinned on the left, with **Checkp
 |------|------|------|
 | Enable Local AI auto prompt | Enable tooltip translation on tag hover and smart insert in the **+** popover | Disabled |
 | Local AI: tooltip translation language | Target language for hover translations (English, 繁體中文, 简体中文, 日本語, 한국어, Français, Deutsch, Español, Português, Русский) | 繁體中文 |
-| Local AI: backend | Local LLM backend | Ollama |
-| Local AI: API base URL | OpenAI-compatible chat completions endpoint | `http://127.0.0.1:11434/v1` |
-| Local AI: model name | Model name loaded in Ollama or LM Studio (e.g. `llama3`, `qwen2.5`) | (empty) |
+| Local AI: backend | Detected backend (Ollama or LM Studio); updated by **Detect Local AI** | Ollama |
+| Local AI: host / IP | Hostname or IP where Ollama or LM Studio runs | `127.0.0.1` |
+| Local AI: model | Model to use; populated by **Detect Local AI**, or type a custom name | (empty) |
 
-Ollama default URL: `http://127.0.0.1:11434/v1`. LM Studio example: `http://127.0.0.1:1234/v1`. Changes to backend, URL, or model usually take effect without **Reload UI**. If the local LLM is unreachable, the UI shows **Local AI connect error** in red.
+Click **Detect Local AI** after entering host / IP. The extension probes **Ollama (`:11434`)** then **LM Studio (`:1234`)**, updates backend and model list, and shows connection status below the host field. Use the 🔄 button beside **Local AI: model** to refresh the model list for the current backend without re-detecting. Click **Apply settings** to save.
+
+If the local LLM is unreachable, the Prompt tab shows **Local AI connect error** in red; Settings detect status shows a more specific error when available.
 
 **Tab slugs (for Column tabs settings)**: `output_browser`, `prompt`, `wildcard`, `lora`, `checkpoints`, `textual_inversion` (display names such as `output browser` also work and are normalized automatically).
 
@@ -141,7 +143,7 @@ Mirrors the **left-side prompt textarea** as a row of tag buttons in Extra Netwo
 
 #### Local AI (optional)
 
-Requires **Enable Local AI auto prompt** in Settings and a running Ollama or LM Studio instance with a compatible OpenAI API.
+Requires **Enable Local AI auto prompt** in Settings and a running Ollama or LM Studio instance. Use **Detect Local AI** in Settings to find the backend and choose a model.
 
 **Tooltip translation (mouse over)**
 
@@ -257,7 +259,8 @@ forge-split-extra-networks/
 │   └── prompt.js            # Prompt tab tags + Local AI tooltip/insert
 └── scripts/
     ├── split_extra_networks.py   # Settings and EN tab registration
-    ├── local_ai_api.py           # Local AI FastAPI routes (tooltip / insert)
+    ├── local_ai_api.py           # Local AI routes, discover, tooltip / insert
+    ├── local_ai_settings_ui.py   # Settings detect button and status
     ├── output_browser_api.py     # Output Browser infotext / delete API
     └── wildcard_api.py           # Wildcard line-list API
 ```

@@ -1145,6 +1145,24 @@
     color: #e74c3c !important;
 }
 
+.forge-en-local-ai-status {
+    margin: 0.35rem 0 0.5rem;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.forge-en-local-ai-status--pending {
+    color: var(--body-text-color-subdued, #aaa);
+}
+
+.forge-en-local-ai-status--ok {
+    color: #2ecc71;
+}
+
+.forge-en-local-ai-status--error {
+    color: #e74c3c;
+}
+
 #txt2img_en_prompt_pane .forge-en-prompt-tag--newline,
 #img2img_en_prompt_pane .forge-en-prompt-tag--newline {
     background-color: rgba(128, 128, 128, 0.22);

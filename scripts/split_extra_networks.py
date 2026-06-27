@@ -2,7 +2,7 @@ import gradio as gr
 import os
 import sys
 
-from modules import errors, script_callbacks, scripts, shared, ui_extra_networks
+from modules import errors, script_callbacks, scripts, shared, ui_extra_networks, ui_components
 from modules.options import OptionDiv
 
 _EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +51,28 @@ _FORGE_EN_LOCAL_AI_TRANSLATE_LANGS = (
 
 def _forge_en_local_ai_translate_lang_dropdown():
     return {"choices": list(_FORGE_EN_LOCAL_AI_TRANSLATE_LANGS)}
+
+
+def _forge_en_local_ai_model_dropdown():
+    try:
+        from local_ai_api import get_cached_model_choices
+
+        choices = get_cached_model_choices()
+    except Exception:
+        choices = []
+    current = (getattr(shared.opts, "forge_en_local_ai_model", None) or "").strip()
+    if current and current not in choices:
+        choices = [current, *choices]
+    return {"choices": choices if choices else [""]}
+
+
+def _refresh_local_ai_models():
+    try:
+        from local_ai_api import list_local_ai_models
+
+        list_local_ai_models()
+    except Exception:
+        pass
 
 
 def _forge_en_settings_spacer():
@@ -132,16 +154,18 @@ shared.options_templates.update(
                 gr.Radio,
                 {"choices": ("Ollama", "LM Studio")},
             ),
-            "forge_en_local_ai_base_url": shared.OptionInfo(
-                "http://127.0.0.1:11434/v1",
-                "Local AI: API base URL",
+            "forge_en_local_ai_host": shared.OptionInfo(
+                "127.0.0.1",
+                "Local AI: host / IP",
                 gr.Textbox,
-            ).info("Ollama default: http://127.0.0.1:11434/v1 — LM Studio: http://127.0.0.1:1234/v1"),
+            ).info("Hostname or IP where Ollama or LM Studio is running"),
             "forge_en_local_ai_model": shared.OptionInfo(
                 "",
-                "Local AI: model name",
-                gr.Textbox,
-            ).info("e.g. llama3, qwen2.5 — must match the model loaded in Ollama or LM Studio"),
+                "Local AI: model",
+                ui_components.DropdownEditable,
+                _forge_en_local_ai_model_dropdown,
+                refresh=_refresh_local_ai_models,
+            ).info("Use Detect Local AI to load models, or type a custom model name"),
             # --- LoRA ---
             "forge_en_spacer_lora": _forge_en_settings_spacer(),
             "forge_en_lora_weight_button_size": shared.OptionInfo(
@@ -210,6 +234,20 @@ shared.options_templates.update(
     )
 )
 
+# Internal-only: keep base_url in data_labels so opts setattr works (UI hidden).
+shared.options_templates.update(
+    shared.options_section(
+        (None, "forge_en_internal", "forge_en_internal"),
+        {
+            "forge_en_local_ai_base_url": shared.OptionInfo(
+                "http://127.0.0.1:11434/v1",
+                "Local AI: API base URL (internal)",
+                gr.Textbox,
+            ),
+        },
+    )
+)
+
 
 def _apply_extra_networks_tab_order():
     order = (shared.opts.forge_en_extra_networks_tab_order or "").strip()
@@ -242,6 +280,12 @@ def _register_prompt():
 
 
 def _on_before_ui():
+    try:
+        from local_ai_api import migrate_local_ai_host_from_legacy_url
+
+        migrate_local_ai_host_from_legacy_url()
+    except Exception:
+        pass
     _apply_extra_networks_tab_order()
     _register_output_browser()
     _register_wildcard()
@@ -285,5 +329,13 @@ try:
 except Exception:
     errors.report(
         "forge-split-extra-networks: local_ai_api load failed",
+        exc_info=True,
+    )
+
+try:
+    import local_ai_settings_ui  # noqa: F401 — settings detect button
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: local_ai_settings_ui load failed",
         exc_info=True,
     )
