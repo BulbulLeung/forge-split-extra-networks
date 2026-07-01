@@ -660,10 +660,28 @@
 
 /* Wildcard: right-click line picker */
 .forge-en-wildcard-context-menu {
-    max-height: min(60vh, 24rem);
-    overflow-y: auto;
     min-width: 14rem;
     max-width: min(90vw, 28rem);
+}
+
+.forge-en-wildcard-context-menu-search {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.85rem;
+    border: none;
+    border-bottom: 1px solid var(--border-color-primary, #555);
+    background: var(--input-background-fill, #1f1f1f);
+    color: var(--body-text-color, #eee);
+    font-size: 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.forge-en-wildcard-context-menu-list {
+    overflow-y: auto;
+    max-height: min(60vh, 20rem);
 }
 
 .forge-en-wildcard-context-menu .forge-en-wildcard-context-menu-title {
@@ -687,6 +705,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.forge-en-wildcard-context-menu-list button.hidden {
+    display: none;
 }
 
 /* Open Folder control (Output Browser / Wildcard toolbar) */

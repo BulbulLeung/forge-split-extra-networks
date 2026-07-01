@@ -397,6 +397,44 @@ function forgeEnWildcardAddLineToPrompt(tabname, line) {
     }
 }
 
+function forgeEnWildcardPopulateContextMenuLines(listEl, lines) {
+    lines.forEach(function (line) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.line = line;
+        btn.textContent = line;
+        btn.title = line;
+        listEl.appendChild(btn);
+    });
+}
+
+function forgeEnWildcardFilterContextMenuLines(listEl, query) {
+    const needle = (query || "").trim().toLowerCase();
+    let visibleCount = 0;
+
+    listEl.querySelectorAll("button[data-line]").forEach(function (btn) {
+        const line = btn.dataset.line || "";
+        const visible =
+            !needle || line.toLowerCase().includes(needle);
+        btn.classList.toggle("hidden", !visible);
+        if (visible) visibleCount++;
+    });
+
+    let emptyMsg = listEl.querySelector(
+        ".forge-en-wildcard-context-menu-message",
+    );
+    if (needle && visibleCount === 0) {
+        if (!emptyMsg) {
+            emptyMsg = document.createElement("div");
+            emptyMsg.className = "forge-en-wildcard-context-menu-message";
+            listEl.appendChild(emptyMsg);
+        }
+        emptyMsg.textContent = "No matching lines";
+    } else if (emptyMsg) {
+        emptyMsg.remove();
+    }
+}
+
 function forgeEnWildcardRenderContextMenuBody(menu, titleText, lines, error) {
     menu.innerHTML = "";
 
@@ -421,14 +459,28 @@ function forgeEnWildcardRenderContextMenuBody(menu, titleText, lines, error) {
         return;
     }
 
-    lines.forEach(function (line) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.dataset.line = line;
-        btn.textContent = line;
-        btn.title = line;
-        menu.appendChild(btn);
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "forge-en-wildcard-context-menu-search";
+    search.placeholder = "Search...";
+    search.addEventListener("mousedown", function (event) {
+        event.stopPropagation();
     });
+    search.addEventListener("click", function (event) {
+        event.stopPropagation();
+    });
+
+    const listEl = document.createElement("div");
+    listEl.className = "forge-en-wildcard-context-menu-list";
+    forgeEnWildcardPopulateContextMenuLines(listEl, lines);
+
+    search.addEventListener("input", function () {
+        forgeEnWildcardFilterContextMenuLines(listEl, search.value);
+    });
+
+    menu.appendChild(search);
+    menu.appendChild(listEl);
+    search.focus();
 }
 
 function forgeEnWildcardPositionContextMenu(menu, clientX, clientY) {
