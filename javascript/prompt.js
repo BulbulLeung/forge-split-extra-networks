@@ -2103,7 +2103,138 @@ async function forgeEnPromptProcessInsert(tabname, index, rawText) {
     return { ok: true };
 }
 
+function forgeEnPromptIsTacVisible(input) {
+    if (!input || typeof isVisible !== "function") return false;
+    const parentDiv = forgeEnPromptGetTagAutocompleteParent(input);
+    if (!parentDiv) return false;
+    try {
+        return isVisible(input);
+    } catch (_err) {
+        return false;
+    }
+}
+
+function forgeEnPromptHideTacResults(input) {
+    if (!input || typeof hideResults !== "function") return;
+    if (!input.classList.contains("autocomplete")) return;
+    try {
+        hideResults(input);
+    } catch (_err) {
+        /* ignore */
+    }
+}
+
+function forgeEnPromptGetTagAutocompleteParent(input) {
+    if (!input) return null;
+    const field = input.closest(".forge-en-prompt-insert-field");
+    const textAreaId =
+        typeof getTextAreaIdentifier === "function"
+            ? getTextAreaIdentifier(input)
+            : null;
+    if (!textAreaId) return null;
+    const selector = ".autocompleteParent" + textAreaId;
+    return (
+        field?.querySelector(selector) ||
+        gradioApp().querySelector(selector)
+    );
+}
+
+function forgeEnPromptFixTagAutocompleteLayout(input) {
+    if (!input) return;
+    const field = input.closest(".forge-en-prompt-insert-field");
+    if (!field) return;
+    const parentDiv = forgeEnPromptGetTagAutocompleteParent(input);
+    if (!parentDiv || parentDiv.style.display !== "flex") return;
+
+    if (!field.contains(parentDiv)) {
+        field.appendChild(parentDiv);
+    }
+
+    parentDiv.style.position = "absolute";
+    parentDiv.style.top = "100%";
+    parentDiv.style.left = "0";
+    parentDiv.style.right = "auto";
+    parentDiv.style.width = "100%";
+    parentDiv.style.maxWidth = "100%";
+    parentDiv.style.marginTop = "4px";
+
+    const resultsDiv = parentDiv.querySelector(".autocompleteResults");
+    if (resultsDiv) {
+        resultsDiv.style.marginTop = "0";
+        resultsDiv.style.width = "100%";
+        resultsDiv.style.maxWidth = "100%";
+        resultsDiv.style.flexBasis = "100%";
+    }
+}
+
+function forgeEnPromptWatchTagAutocompleteLayout(input) {
+    if (!input || input._forgeEnPromptTacObserved) return;
+
+    const bindObserver = function () {
+        const parentDiv = forgeEnPromptGetTagAutocompleteParent(input);
+        if (!parentDiv) return false;
+
+        const observer = new MutationObserver(function () {
+            if (parentDiv.style.display === "flex") {
+                forgeEnPromptFixTagAutocompleteLayout(input);
+            }
+        });
+        observer.observe(parentDiv, {
+            attributes: true,
+            attributeFilter: ["style"],
+        });
+        input._forgeEnPromptTacObserved = true;
+        input._forgeEnPromptTacObserver = observer;
+        return true;
+    };
+
+    if (!bindObserver() && typeof onUiUpdate === "function") {
+        onUiUpdate(function () {
+            if (!input._forgeEnPromptTacObserved) {
+                bindObserver();
+            }
+        });
+    }
+}
+
+function forgeEnPromptAttachTagAutocomplete(input) {
+    if (!input || input.classList.contains("autocomplete")) return true;
+    if (typeof addAutocompleteToArea !== "function") return false;
+    if (typeof TAC_CFG === "undefined" || !TAC_CFG) return false;
+    addAutocompleteToArea(input);
+    const attached = input.classList.contains("autocomplete");
+    if (attached && !input._forgeEnPromptTacInputBound) {
+        input._forgeEnPromptTacInputBound = true;
+        forgeEnPromptWatchTagAutocompleteLayout(input);
+        input.addEventListener("input", function () {
+            requestAnimationFrame(function () {
+                if (forgeEnPromptIsTacVisible(input)) {
+                    forgeEnPromptFixTagAutocompleteLayout(input);
+                }
+            });
+        });
+    }
+    return attached;
+}
+
+function forgeEnPromptEnsureTagAutocomplete(input) {
+    if (!input || forgeEnPromptAttachTagAutocomplete(input)) return;
+    if (typeof onUiUpdate !== "function") return;
+    onUiUpdate(function () {
+        const el = forgeEnPromptInsertPopoverEl?.querySelector(
+            ".forge-en-prompt-insert-input",
+        );
+        if (el) forgeEnPromptAttachTagAutocomplete(el);
+    });
+}
+
 function forgeEnPromptHideInsertPopover() {
+    const input = forgeEnPromptInsertPopoverEl?.querySelector(
+        ".forge-en-prompt-insert-input",
+    );
+    if (input) {
+        forgeEnPromptHideTacResults(input);
+    }
     if (forgeEnPromptInsertPopoverEl) {
         forgeEnPromptInsertPopoverEl.style.display = "none";
         forgeEnPromptSetInsertLoading(false);
@@ -2122,6 +2253,22 @@ function forgeEnPromptUpdateInsertPopoverHelp(popover, mode) {
 
 function forgeEnPromptEnsureInsertPopover() {
     if (forgeEnPromptInsertPopoverEl) {
+        const legacyInput = forgeEnPromptInsertPopoverEl.querySelector(
+            ".forge-en-prompt-insert-input",
+        );
+        if (
+            legacyInput &&
+            !legacyInput.closest(".forge-en-prompt-insert-field")
+        ) {
+            const field = document.createElement("div");
+            field.className = "forge-en-prompt-insert-field";
+            legacyInput.parentNode.insertBefore(field, legacyInput);
+            field.appendChild(legacyInput);
+            const parentDiv = forgeEnPromptGetTagAutocompleteParent(legacyInput);
+            if (parentDiv && !field.contains(parentDiv)) {
+                field.appendChild(parentDiv);
+            }
+        }
         return forgeEnPromptInsertPopoverEl;
     }
 
@@ -2132,7 +2279,9 @@ function forgeEnPromptEnsureInsertPopover() {
     popover.className = "forge-en-prompt-insert-popover";
     popover.style.display = "none";
     popover.innerHTML =
+        '<div class="forge-en-prompt-insert-field">' +
         '<input type="text" class="forge-en-prompt-insert-input" autocomplete="off" spellcheck="false" />' +
+        "</div>" +
         '<div class="forge-en-prompt-insert-help" style="display:none">' +
         "<div>Plain text: English is inserted directly; non-English is translated to English first.</div>" +
         "<div># prefix: Local AI generates SD prompt tags from a sentence (multiple tags supported).</div>" +
@@ -2195,14 +2344,19 @@ function forgeEnPromptEnsureInsertPopover() {
     });
 
     input.addEventListener("keydown", function (event) {
+        const tacVisible = forgeEnPromptIsTacVisible(input);
         if (event.key === "Enter") {
+            if (tacVisible) return;
             event.preventDefault();
             confirmBtn.click();
         } else if (event.key === "Escape") {
+            if (tacVisible) return;
             event.preventDefault();
             forgeEnPromptHideInsertPopover();
         }
     });
+
+    forgeEnPromptEnsureTagAutocomplete(input);
 
     document.addEventListener("mousedown", function (event) {
         if (
@@ -2269,6 +2423,8 @@ function forgeEnPromptShowPopover(anchor, tabname, index, mode, initialText) {
     forgeEnPromptSetInsertStatus("", false);
     forgeEnPromptSetInsertLoading(false);
     forgeEnPromptPositionInsertPopover(popover, anchor);
+    forgeEnPromptEnsureTagAutocomplete(input);
+    forgeEnPromptHideTacResults(input);
     input.focus();
     if (popoverMode === "edit") {
         input.select();

@@ -1074,6 +1074,13 @@
     background: var(--body-background-fill, #2b2b2b);
     border: 1px solid var(--border-color-primary, #555);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    overflow: visible;
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-field {
+    position: relative;
+    width: 100%;
+    flex-shrink: 0;
 }
 
 .forge-en-prompt-insert-popover .forge-en-prompt-insert-input {
@@ -1085,6 +1092,37 @@
     background: var(--input-background-fill, #1f1f1f);
     color: var(--body-text-color, #eee);
     font-size: 0.9rem;
+    position: relative;
+    z-index: 3;
+}
+
+.forge-en-prompt-insert-popover .forge-en-prompt-insert-field .autocompleteParent {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: auto;
+    width: 100%;
+    max-width: 100%;
+    z-index: 2;
+    margin: 4px 0 0;
+    flex-direction: column;
+    gap: 0;
+}
+
+.forge-en-prompt-insert-popover .autocompleteResults {
+    margin-top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+}
+
+.forge-en-prompt-insert-popover .autocompleteResultsList > li {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.forge-en-prompt-insert-popover .autocompleteParent .sideInfo {
+    display: none !important;
 }
 
 .forge-en-prompt-insert-popover .forge-en-prompt-insert-help {
