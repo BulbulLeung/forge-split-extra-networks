@@ -1667,10 +1667,17 @@ async function forgeEnPromptPasteTagsAtEnd(tabname) {
     }
 
     const parts = forgeEnPromptSplitParts(textarea.value || "");
-    const endIndex = parts.length > 0 ? parts.length - 1 : -1;
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    const selected = container ? forgeEnPromptGetSelectedIndices(container) : [];
+    let insertAfterIndex;
+    if (selected.length > 0) {
+        insertAfterIndex = Math.max.apply(Math, selected);
+    } else {
+        insertAfterIndex = parts.length > 0 ? parts.length - 1 : -1;
+    }
 
     forgeEnPromptHideTagTooltip();
-    forgeEnPromptInsertMultipleAfter(tabname, endIndex, parsed);
+    forgeEnPromptInsertMultipleAfter(tabname, insertAfterIndex, parsed);
 }
 
 function forgeEnPromptDeleteSelectedFromKeyboard() {
@@ -1689,6 +1696,52 @@ function forgeEnPromptDeleteSelectedFromKeyboard() {
     return true;
 }
 
+function forgeEnPromptOpenEditPopover(tabname, index, anchorButton) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea || !anchorButton) {
+        return false;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    if (index < 0 || index >= parts.length) {
+        return false;
+    }
+
+    const initialText = forgeEnPromptPartToCopyText(parts[index] || "");
+    forgeEnPromptShowPopover(anchorButton, tabname, index, "edit", initialText);
+    return true;
+}
+
+function forgeEnPromptEditSelectedFromKeyboard() {
+    if (forgeEnPromptIsInsertPopoverOpen()) {
+        return false;
+    }
+
+    const tabname = forgeEnPromptGetActivePromptTabname();
+    if (!tabname) {
+        return false;
+    }
+
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    if (!container) {
+        return false;
+    }
+
+    const selected = forgeEnPromptGetSelectedIndices(container);
+    if (selected.length !== 1) {
+        return false;
+    }
+
+    const index = selected[0];
+    const buttons = forgeEnPromptGetTagButtons(container);
+    const button = buttons[index];
+    if (!button) {
+        return false;
+    }
+
+    return forgeEnPromptOpenEditPopover(tabname, index, button);
+}
+
 function forgeEnPromptShouldHandleTagKeyboard(event) {
     if (forgeEnPromptIsEditableTarget(event.target)) {
         return false;
@@ -1702,6 +1755,17 @@ function forgeEnPromptKeyHandler(event) {
             return;
         }
         if (forgeEnPromptDeleteSelectedFromKeyboard()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        return;
+    }
+
+    if (event.key === "Enter") {
+        if (forgeEnPromptIsEditableTarget(event.target)) {
+            return;
+        }
+        if (forgeEnPromptEditSelectedFromKeyboard()) {
             event.preventDefault();
             event.stopPropagation();
         }
@@ -3226,13 +3290,7 @@ function forgeEnPromptBindTagsContainers() {
             const index = parseInt(button.dataset.index, 10);
             if (Number.isNaN(index)) return;
 
-            const textarea = forgeEnPromptGetTextarea(tabname);
-            const parts = forgeEnPromptSplitParts(
-                textarea ? textarea.value || "" : "",
-            );
-            const part = parts[index];
-            const initialText = forgeEnPromptPartToCopyText(part || "");
-            forgeEnPromptShowPopover(button, tabname, index, "edit", initialText);
+            forgeEnPromptOpenEditPopover(tabname, index, button);
         });
 
         container.addEventListener("contextmenu", function (event) {
