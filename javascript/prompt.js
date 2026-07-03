@@ -730,13 +730,6 @@ function forgeEnPromptTagTypeClass(part, parts, index) {
         }
         return FORGE_EN_PROMPT_TAG_CLASS_BRACE_ALT;
     }
-    if (
-        parts &&
-        index !== undefined &&
-        forgeEnPromptIsBraceInnerPart(parts, index)
-    ) {
-        return FORGE_EN_PROMPT_TAG_CLASS_BRACE_INNER;
-    }
     if (forgeEnPromptIsLoraPart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_LORA;
     }
@@ -747,6 +740,22 @@ function forgeEnPromptTagTypeClass(part, parts, index) {
         return FORGE_EN_PROMPT_TAG_CLASS_BREAK;
     }
     return "";
+}
+
+function forgeEnPromptTagTypeClasses(part, parts, index) {
+    const classes = [];
+    const primary = forgeEnPromptTagTypeClass(part, parts, index);
+    if (primary) {
+        classes.push(primary);
+    }
+    if (
+        parts &&
+        index !== undefined &&
+        forgeEnPromptIsBraceInnerPart(parts, index)
+    ) {
+        classes.push(FORGE_EN_PROMPT_TAG_CLASS_BRACE_INNER);
+    }
+    return classes.join(" ");
 }
 
 function forgeEnPromptNormalizeTagForDuplicate(part) {
@@ -2868,7 +2877,7 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
 
         const button = document.createElement("button");
         button.type = "button";
-        const typeClass = forgeEnPromptTagTypeClass(part, parts, index);
+        const typeClass = forgeEnPromptTagTypeClasses(part, parts, index);
         button.className =
             "lg secondary gradio-button custom-button " +
             FORGE_EN_PROMPT_TAG_CLASS +
