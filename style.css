@@ -931,6 +931,63 @@
     user-select: none;
 }
 
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-inner:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-inner:not(.forge-en-output-selected) {
+    outline: 2px solid rgba(181, 124, 255, 0.85);
+    outline-offset: -1px;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-open:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-open:not(.forge-en-output-selected),
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected) {
+    border-color: rgba(181, 124, 255, 0.55);
+    color: rgba(181, 124, 255, 0.95);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+    min-width: 2.25rem;
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-open-unclosed:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-open-unclosed:not(.forge-en-output-selected),
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-close-unmatched:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-close-unmatched:not(.forge-en-output-selected),
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-alt-outside:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-alt-outside:not(.forge-en-output-selected) {
+    outline: 2px solid #e74c3c;
+    outline-offset: -1px;
+    border-color: rgba(231, 76, 60, 0.65);
+    color: #e74c3c;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+    min-width: 2.25rem;
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-alt-outside:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-alt-outside:not(.forge-en-output-selected) {
+    min-width: 1.75rem;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-alt:not(.forge-en-output-selected),
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-alt:not(.forge-en-output-selected) {
+    border-color: rgba(181, 124, 255, 0.45);
+    color: rgba(181, 124, 255, 0.9);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 700;
+    min-width: 1.75rem;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+    text-align: center;
+}
+
 #txt2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected),
 #img2img_en_prompt_pane .forge-en-prompt-tag--wildcard:not(.forge-en-output-selected) {
     background-color: rgba(255, 140, 50, 0.32);

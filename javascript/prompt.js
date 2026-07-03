@@ -13,7 +13,20 @@ const FORGE_EN_PROMPT_TAG_CLASS_LORA = "forge-en-prompt-tag--lora";
 const FORGE_EN_PROMPT_TAG_CLASS_BREAK = "forge-en-prompt-tag--break";
 const FORGE_EN_PROMPT_NEWLINE_MARKER = "\u0001";
 const FORGE_EN_PROMPT_NEWLINE_LABEL = "\\n";
+const FORGE_EN_PROMPT_BRACE_OPEN_MARKER = "\u0002";
+const FORGE_EN_PROMPT_BRACE_CLOSE_MARKER = "\u0003";
+const FORGE_EN_PROMPT_BRACE_ALT_MARKER = "\u0004";
 const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_OPEN = "forge-en-prompt-tag--brace-open";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_OPEN_UNCLOSED =
+    "forge-en-prompt-tag--brace-open-unclosed";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_CLOSE = "forge-en-prompt-tag--brace-close";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_CLOSE_UNMATCHED =
+    "forge-en-prompt-tag--brace-close-unmatched";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_ALT = "forge-en-prompt-tag--brace-alt";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_ALT_OUTSIDE =
+    "forge-en-prompt-tag--brace-alt-outside";
+const FORGE_EN_PROMPT_TAG_CLASS_BRACE_INNER = "forge-en-prompt-tag--brace-inner";
 const FORGE_EN_PROMPT_TAG_CLASS_DUPLICATE = "forge-en-prompt-tag--duplicate";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
 const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+(?::[^>]+)?>$/i;
@@ -323,6 +336,282 @@ function forgeEnPromptIsNewlinePart(part) {
     return part === FORGE_EN_PROMPT_NEWLINE_MARKER;
 }
 
+function forgeEnPromptIsBraceOpenPart(part) {
+    return part === FORGE_EN_PROMPT_BRACE_OPEN_MARKER;
+}
+
+function forgeEnPromptIsBraceClosePart(part) {
+    return part === FORGE_EN_PROMPT_BRACE_CLOSE_MARKER;
+}
+
+function forgeEnPromptIsBraceAltPart(part) {
+    return part === FORGE_EN_PROMPT_BRACE_ALT_MARKER;
+}
+
+function forgeEnPromptIsBraceStructuralPart(part) {
+    return (
+        forgeEnPromptIsBraceOpenPart(part) ||
+        forgeEnPromptIsBraceClosePart(part) ||
+        forgeEnPromptIsBraceAltPart(part)
+    );
+}
+
+function forgeEnPromptGetBraceDepthAt(parts, index) {
+    let depth = 0;
+    for (let i = 0; i < index; i++) {
+        if (forgeEnPromptIsBraceOpenPart(parts[i])) {
+            depth++;
+        } else if (forgeEnPromptIsBraceClosePart(parts[i])) {
+            depth = Math.max(0, depth - 1);
+        }
+    }
+    return depth;
+}
+
+function forgeEnPromptIsBraceInnerPart(parts, index) {
+    const part = parts[index];
+    if (
+        forgeEnPromptIsBraceStructuralPart(part) ||
+        forgeEnPromptIsNewlinePart(part)
+    ) {
+        return false;
+    }
+    return forgeEnPromptGetBraceDepthAt(parts, index) > 0;
+}
+
+function forgeEnPromptIsBraceOpenUnclosed(parts, index) {
+    if (!forgeEnPromptIsBraceOpenPart(parts[index])) {
+        return false;
+    }
+    let depth = 1;
+    for (let i = index + 1; i < parts.length; i++) {
+        if (forgeEnPromptIsNewlinePart(parts[i])) {
+            return true;
+        }
+        if (forgeEnPromptIsBraceOpenPart(parts[i])) {
+            depth++;
+        } else if (forgeEnPromptIsBraceClosePart(parts[i])) {
+            depth--;
+            if (depth === 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function forgeEnPromptIsBraceCloseUnmatched(parts, index) {
+    if (!forgeEnPromptIsBraceClosePart(parts[index])) {
+        return false;
+    }
+    return forgeEnPromptGetBraceDepthAt(parts, index) === 0;
+}
+
+function forgeEnPromptIsBraceAltOutside(parts, index) {
+    if (!forgeEnPromptIsBraceAltPart(parts[index])) {
+        return false;
+    }
+    return forgeEnPromptGetBraceDepthAt(parts, index) === 0;
+}
+
+function forgeEnPromptPartDisplayLabel(part) {
+    if (forgeEnPromptIsNewlinePart(part)) {
+        return FORGE_EN_PROMPT_NEWLINE_LABEL;
+    }
+    if (forgeEnPromptIsBraceOpenPart(part)) {
+        return "{";
+    }
+    if (forgeEnPromptIsBraceClosePart(part)) {
+        return "}";
+    }
+    if (forgeEnPromptIsBraceAltPart(part)) {
+        return "|";
+    }
+    return part;
+}
+
+function forgeEnPromptNormalizeEditedPart(trimmed) {
+    if (trimmed === "{") {
+        return FORGE_EN_PROMPT_BRACE_OPEN_MARKER;
+    }
+    if (trimmed === "}") {
+        return FORGE_EN_PROMPT_BRACE_CLOSE_MARKER;
+    }
+    if (trimmed === "|") {
+        return FORGE_EN_PROMPT_BRACE_ALT_MARKER;
+    }
+    return trimmed;
+}
+
+function forgeEnPromptExpandBraceInner(inner) {
+    const result = [];
+    let current = "";
+    for (let i = 0; i < inner.length; i++) {
+        const ch = inner[i];
+        if (ch === "|") {
+            const trimmed = current.trim();
+            if (trimmed.length > 0) {
+                result.push(trimmed);
+            }
+            result.push(FORGE_EN_PROMPT_BRACE_ALT_MARKER);
+            current = "";
+        } else if (ch === ",") {
+            const trimmed = current.trim();
+            if (trimmed.length > 0) {
+                result.push(trimmed);
+            }
+            current = "";
+        } else {
+            current += ch;
+        }
+    }
+    const trimmed = current.trim();
+    if (trimmed.length > 0) {
+        result.push(trimmed);
+    }
+    return result;
+}
+
+function forgeEnPromptFormatBraceGroupContent(innerParts) {
+    let content = "";
+    let needComma = false;
+    innerParts.forEach(function (inner) {
+        if (forgeEnPromptIsBraceAltPart(inner)) {
+            content += " | ";
+            needComma = false;
+            return;
+        }
+        if (forgeEnPromptIsBraceOpenPart(inner)) {
+            if (needComma) {
+                content += ", ";
+            }
+            content += "{";
+            needComma = false;
+            return;
+        }
+        if (needComma) {
+            content += ", ";
+        }
+        content += inner;
+        needComma = true;
+    });
+    return content;
+}
+
+function forgeEnPromptSplitLineByComma(line) {
+    const segments = [];
+    let current = "";
+    let braceDepth = 0;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === "{") {
+            braceDepth++;
+            current += ch;
+        } else if (ch === "}") {
+            braceDepth = Math.max(0, braceDepth - 1);
+            current += ch;
+        } else if (ch === "," && braceDepth === 0) {
+            const trimmed = current.trim();
+            if (trimmed.length > 0) {
+                segments.push(trimmed);
+            }
+            current = "";
+        } else {
+            current += ch;
+        }
+    }
+    const trimmed = current.trim();
+    if (trimmed.length > 0) {
+        segments.push(trimmed);
+    }
+    return segments;
+}
+
+function forgeEnPromptExpandBracePart(part) {
+    const trimmed = part.trim();
+    if (trimmed === "{") {
+        return [FORGE_EN_PROMPT_BRACE_OPEN_MARKER];
+    }
+    if (trimmed === "}") {
+        return [FORGE_EN_PROMPT_BRACE_CLOSE_MARKER];
+    }
+    if (trimmed === "|") {
+        return [FORGE_EN_PROMPT_BRACE_ALT_MARKER];
+    }
+    if (!trimmed.startsWith("{")) {
+        return [part];
+    }
+
+    const result = [FORGE_EN_PROMPT_BRACE_OPEN_MARKER];
+    let inner;
+    let hasClose = false;
+    if (trimmed.endsWith("}") && trimmed.length > 1) {
+        inner = trimmed.slice(1, -1);
+        hasClose = true;
+    } else {
+        inner = trimmed.slice(1);
+    }
+
+    const innerParts = forgeEnPromptExpandBraceInner(inner);
+    innerParts.forEach(function (innerPart) {
+        result.push(innerPart);
+    });
+
+    if (hasClose) {
+        result.push(FORGE_EN_PROMPT_BRACE_CLOSE_MARKER);
+    }
+    return result;
+}
+
+function forgeEnPromptJoinLineParts(lineParts) {
+    const segments = [];
+    let index = 0;
+    while (index < lineParts.length) {
+        const part = lineParts[index];
+        if (forgeEnPromptIsBraceOpenPart(part)) {
+            const innerParts = [];
+            let closed = false;
+            index++;
+            while (index < lineParts.length) {
+                const inner = lineParts[index];
+                if (forgeEnPromptIsBraceClosePart(inner)) {
+                    closed = true;
+                    index++;
+                    break;
+                }
+                innerParts.push(inner);
+                index++;
+            }
+            const content = forgeEnPromptFormatBraceGroupContent(innerParts);
+            if (closed) {
+                if (content.length === 0) {
+                    segments.push("{}");
+                } else {
+                    segments.push("{ " + content + " }");
+                }
+            } else if (content.length === 0) {
+                segments.push("{");
+            } else {
+                segments.push("{ " + content);
+            }
+            continue;
+        }
+        if (forgeEnPromptIsBraceClosePart(part)) {
+            segments.push("}");
+            index++;
+            continue;
+        }
+        if (forgeEnPromptIsBraceAltPart(part)) {
+            segments.push("|");
+            index++;
+            continue;
+        }
+        segments.push(part);
+        index++;
+    }
+    return segments.join(FORGE_EN_PROMPT_SEPARATOR);
+}
+
 function forgeEnPromptSplitParts(text) {
     if (!text) return [];
     const parts = [];
@@ -330,11 +619,10 @@ function forgeEnPromptSplitParts(text) {
         if (lineIndex > 0) {
             parts.push(FORGE_EN_PROMPT_NEWLINE_MARKER);
         }
-        line.split(",").forEach(function (part) {
-            const trimmed = part.trim();
-            if (trimmed.length > 0) {
-                parts.push(trimmed);
-            }
+        forgeEnPromptSplitLineByComma(line).forEach(function (part) {
+            forgeEnPromptExpandBracePart(part).forEach(function (expanded) {
+                parts.push(expanded);
+            });
         });
     });
     return parts;
@@ -346,7 +634,7 @@ function forgeEnPromptJoinParts(parts) {
     parts.forEach(function (part) {
         if (forgeEnPromptIsNewlinePart(part)) {
             if (current.length > 0) {
-                lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR) + ",");
+                lines.push(forgeEnPromptJoinLineParts(current) + ",");
             } else {
                 lines.push("");
             }
@@ -355,7 +643,7 @@ function forgeEnPromptJoinParts(parts) {
             current.push(part);
         }
     });
-    lines.push(current.join(FORGE_EN_PROMPT_SEPARATOR));
+    lines.push(forgeEnPromptJoinLineParts(current));
     return lines.join("\n");
 }
 
@@ -403,13 +691,51 @@ function forgeEnPromptTagTooltipNeedsTranslation(partText) {
     return (
         !forgeEnPromptIsLoraPart(partText) &&
         !forgeEnPromptIsWildcardPart(partText) &&
-        !forgeEnPromptIsBreakPart(partText)
+        !forgeEnPromptIsBreakPart(partText) &&
+        !forgeEnPromptIsBraceStructuralPart(partText)
     );
 }
 
-function forgeEnPromptTagTypeClass(part) {
+function forgeEnPromptTagTypeClass(part, parts, index) {
     if (forgeEnPromptIsNewlinePart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_NEWLINE;
+    }
+    if (forgeEnPromptIsBraceOpenPart(part)) {
+        if (
+            parts &&
+            index !== undefined &&
+            forgeEnPromptIsBraceOpenUnclosed(parts, index)
+        ) {
+            return FORGE_EN_PROMPT_TAG_CLASS_BRACE_OPEN_UNCLOSED;
+        }
+        return FORGE_EN_PROMPT_TAG_CLASS_BRACE_OPEN;
+    }
+    if (forgeEnPromptIsBraceClosePart(part)) {
+        if (
+            parts &&
+            index !== undefined &&
+            forgeEnPromptIsBraceCloseUnmatched(parts, index)
+        ) {
+            return FORGE_EN_PROMPT_TAG_CLASS_BRACE_CLOSE_UNMATCHED;
+        }
+        return FORGE_EN_PROMPT_TAG_CLASS_BRACE_CLOSE;
+    }
+    if (forgeEnPromptIsBraceAltPart(part)) {
+        if (
+            parts &&
+            index !== undefined &&
+            forgeEnPromptIsBraceAltOutside(parts, index)
+        ) {
+            return FORGE_EN_PROMPT_TAG_CLASS_BRACE_ALT_OUTSIDE;
+        }
+        return FORGE_EN_PROMPT_TAG_CLASS_BRACE_ALT;
+    }
+    if (
+        parts &&
+        index !== undefined &&
+        forgeEnPromptIsBraceInnerPart(parts, index)
+    ) {
+        return FORGE_EN_PROMPT_TAG_CLASS_BRACE_INNER;
     }
     if (forgeEnPromptIsLoraPart(part)) {
         return FORGE_EN_PROMPT_TAG_CLASS_LORA;
@@ -424,7 +750,10 @@ function forgeEnPromptTagTypeClass(part) {
 }
 
 function forgeEnPromptNormalizeTagForDuplicate(part) {
-    if (forgeEnPromptIsNewlinePart(part)) {
+    if (
+        forgeEnPromptIsNewlinePart(part) ||
+        forgeEnPromptIsBraceStructuralPart(part)
+    ) {
         return null;
     }
     const lora = forgeEnPromptParseLoraPart(part);
@@ -666,6 +995,9 @@ function forgeEnPromptShouldShowWeightControls(part, lineLocalIdx, meta) {
     if (forgeEnPromptIsNewlinePart(part)) {
         return false;
     }
+    if (forgeEnPromptIsBraceStructuralPart(part)) {
+        return false;
+    }
     if (forgeEnPromptIsWildcardPart(part)) {
         return false;
     }
@@ -693,6 +1025,18 @@ function forgeEnPromptGetLineContext(parts, globalIdx) {
 
     for (let i = 0; i < parts.length; i++) {
         if (forgeEnPromptIsNewlinePart(parts[i])) {
+            if (lineGlobalIndices.indexOf(globalIdx) >= 0) {
+                return {
+                    lineParts: lineParts,
+                    lineGlobalIndices: lineGlobalIndices,
+                    lineLocalIdx: lineGlobalIndices.indexOf(globalIdx),
+                };
+            }
+            lineParts = [];
+            lineGlobalIndices = [];
+            continue;
+        }
+        if (forgeEnPromptIsBraceStructuralPart(parts[i])) {
             if (lineGlobalIndices.indexOf(globalIdx) >= 0) {
                 return {
                     lineParts: lineParts,
@@ -961,8 +1305,12 @@ function forgeEnPromptInsertAfter(tabname, index, newText) {
 
     const parts = forgeEnPromptSplitParts(textarea.value || "");
     const insertAt = Math.min(Math.max(0, index + 1), parts.length);
-    parts.splice(insertAt, 0, trimmed);
-    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    const expanded = forgeEnPromptExpandBracePart(trimmed);
+    parts.splice(insertAt, 0, ...expanded);
+    const caret = forgeEnPromptOffsetForPartsPrefix(
+        parts,
+        insertAt + expanded.length,
+    );
     forgeEnPromptApplyTextarea(
         tabname,
         textarea,
@@ -1219,7 +1567,10 @@ function forgeEnPromptGetVisibleMainTab() {
 }
 
 function forgeEnPromptPartToCopyText(part) {
-    return forgeEnPromptIsNewlinePart(part) ? "\\n" : part;
+    if (forgeEnPromptIsNewlinePart(part)) {
+        return "\\n";
+    }
+    return forgeEnPromptPartDisplayLabel(part);
 }
 
 function forgeEnPromptGetActivePromptTabname() {
@@ -1398,8 +1749,18 @@ function forgeEnPromptUpdateAt(tabname, index, newText) {
         caret = forgeEnPromptOffsetForPartsPrefix(parts, index + 1);
         scroll = "caretLineIfNeeded";
     } else {
-        parts[index] = trimmed;
-        caret = forgeEnPromptOffsetForPartsPrefix(parts, index + 1);
+        const normalized = forgeEnPromptNormalizeEditedPart(trimmed);
+        const expanded = forgeEnPromptExpandBracePart(normalized);
+        if (expanded.length === 1) {
+            parts[index] = expanded[0];
+            caret = forgeEnPromptOffsetForPartsPrefix(parts, index + 1);
+        } else {
+            parts.splice(index, 1, ...expanded);
+            caret = forgeEnPromptOffsetForPartsPrefix(
+                parts,
+                index + expanded.length,
+            );
+        }
     }
 
     forgeEnPromptApplyTextarea(
@@ -2494,14 +2855,20 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
     let lineParts = [];
     let lineIndices = [];
 
-    function forgeEnPromptAppendTagButton(part, index, partStyles, meta, lineLocalIdx) {
+    function forgeEnPromptAppendTagButton(
+        part,
+        index,
+        partStyles,
+        meta,
+        lineLocalIdx,
+    ) {
         const wrap = document.createElement("div");
         wrap.className = FORGE_EN_PROMPT_TAG_WRAP_CLASS;
         wrap.dataset.index = String(index);
 
         const button = document.createElement("button");
         button.type = "button";
-        const typeClass = forgeEnPromptTagTypeClass(part);
+        const typeClass = forgeEnPromptTagTypeClass(part, parts, index);
         button.className =
             "lg secondary gradio-button custom-button " +
             FORGE_EN_PROMPT_TAG_CLASS +
@@ -2521,7 +2888,7 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
                 partStyles,
             );
         } else {
-            button.textContent = part;
+            button.textContent = forgeEnPromptPartDisplayLabel(part);
         }
         wrap.appendChild(button);
 
@@ -2530,6 +2897,23 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
         }
 
         fragment.appendChild(wrap);
+    }
+
+    function forgeEnPromptAppendBraceStructuralButton(part, index) {
+        const button = document.createElement("button");
+        button.type = "button";
+        const typeClass = forgeEnPromptTagTypeClass(part, parts, index);
+        button.className =
+            "lg secondary gradio-button custom-button " +
+            FORGE_EN_PROMPT_TAG_CLASS +
+            (typeClass ? " " + typeClass : "");
+        button.dataset.index = String(index);
+        if (selectedIndices.has(index)) {
+            button.classList.add(FORGE_EN_PROMPT_SELECTED_CLASS);
+        }
+        button.dataset.promptText = part;
+        button.textContent = forgeEnPromptPartDisplayLabel(part);
+        fragment.appendChild(button);
     }
 
     function forgeEnPromptFlushParenLine() {
@@ -2566,6 +2950,11 @@ function forgeEnPromptSyncTags(tabname, forceSync) {
             }
             button.textContent = FORGE_EN_PROMPT_NEWLINE_LABEL;
             fragment.appendChild(button);
+            return;
+        }
+        if (forgeEnPromptIsBraceStructuralPart(part)) {
+            forgeEnPromptFlushParenLine();
+            forgeEnPromptAppendBraceStructuralButton(part, index);
             return;
         }
         lineParts.push(part);
@@ -2833,9 +3222,7 @@ function forgeEnPromptBindTagsContainers() {
                 textarea ? textarea.value || "" : "",
             );
             const part = parts[index];
-            const initialText = forgeEnPromptIsNewlinePart(part)
-                ? "\\n"
-                : part || "";
+            const initialText = forgeEnPromptPartToCopyText(part || "");
             forgeEnPromptShowPopover(button, tabname, index, "edit", initialText);
         });
 
