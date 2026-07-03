@@ -16,8 +16,8 @@ const FORGE_EN_PROMPT_NEWLINE_LABEL = "\\n";
 const FORGE_EN_PROMPT_TAG_CLASS_NEWLINE = "forge-en-prompt-tag--newline";
 const FORGE_EN_PROMPT_TAG_CLASS_DUPLICATE = "forge-en-prompt-tag--duplicate";
 const FORGE_EN_PROMPT_DEFAULT_WILDCARD_WRAP = "__";
-const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+>$/i;
-const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+\)$/i;
+const FORGE_EN_PROMPT_LORA_RE = /^<lora:[^:>]+:[\d.]+(?::[^>]+)?>$/i;
+const FORGE_EN_PROMPT_LORA_NEG_RE = /^\(lora:[^:)]+:[\d.]+(?::[^)]+)?\)$/i;
 const FORGE_EN_PROMPT_TAG_CLASS_PAREN = "forge-en-prompt-tag__paren";
 const FORGE_EN_PROMPT_TAG_CLASS_PAREN_UNCLOSED =
     "forge-en-prompt-tag__paren-unclosed";
@@ -587,32 +587,45 @@ function forgeEnPromptParseClosingPartWeight(part) {
     return null;
 }
 
-function forgeEnPromptParseLoraPart(part) {
-    let match = part.match(/^<lora:([^:>]+):([\d.]+)>$/i);
-    if (match) {
-        return {
-            name: match[1],
-            weight: parseFloat(match[2]),
-            neg: false,
-        };
+function forgeEnPromptParseLoraInner(inner, neg) {
+    const segments = String(inner || "").split(":");
+    if (segments.length < 2) {
+        return null;
     }
-    match = part.match(/^\(lora:([^:)]+):([\d.]+)\)$/i);
+    const name = segments[0];
+    const weight = parseFloat(segments[1]);
+    if (!name || Number.isNaN(weight)) {
+        return null;
+    }
+    const extraTail =
+        segments.length > 2 ? segments.slice(2).join(":") : null;
+    return {
+        name: name,
+        weight: weight,
+        neg: neg,
+        extraTail: extraTail,
+    };
+}
+
+function forgeEnPromptParseLoraPart(part) {
+    let match = part.match(/^<lora:([^>]+)>$/i);
     if (match) {
-        return {
-            name: match[1],
-            weight: parseFloat(match[2]),
-            neg: true,
-        };
+        return forgeEnPromptParseLoraInner(match[1], false);
+    }
+    match = part.match(/^\(lora:([^)]+)\)$/i);
+    if (match) {
+        return forgeEnPromptParseLoraInner(match[1], true);
     }
     return null;
 }
 
-function forgeEnPromptFormatLoraPart(name, weight, neg) {
+function forgeEnPromptFormatLoraPart(name, weight, neg, extraTail) {
     const w = forgeEnPromptFormatWeight(weight);
+    const tail = extraTail ? ":" + extraTail : "";
     if (neg) {
-        return "(lora:" + name + ":" + w + ")";
+        return "(lora:" + name + ":" + w + tail + ")";
     }
-    return "<lora:" + name + ":" + w + ">";
+    return "<lora:" + name + ":" + w + tail + ">";
 }
 
 function forgeEnPromptFormatSingleTagWeight(inner, weight) {
@@ -725,6 +738,7 @@ function forgeEnPromptAdjustPartWeight(parts, globalIdx, delta) {
             lora.name,
             newWeight,
             lora.neg,
+            lora.extraTail,
         );
         return;
     }

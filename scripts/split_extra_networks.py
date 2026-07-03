@@ -174,6 +174,10 @@ shared.options_templates.update(
                 gr.Radio,
                 {"choices": ("Small", "Medium", "Big")},
             ),
+            "forge_en_lora_lbw_enabled": shared.OptionInfo(
+                True,
+                "Lora tab: show LoRA Block Weight Neo preset selector on active cards",
+            ).info("Requires lora-block-weight-neo extension; enable LoRA Block Weight in Scripts for generation"),
             # --- Tab order ---
             "forge_en_spacer_tabs": _forge_en_settings_spacer(),
             "forge_en_extra_networks_tab_order": shared.OptionInfo(
@@ -321,6 +325,14 @@ try:
 except Exception:
     errors.report(
         "forge-split-extra-networks: wildcard_api load failed",
+        exc_info=True,
+    )
+
+try:
+    import lora_lbw_api  # noqa: F401 — registers on_app_started routes
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: lora_lbw_api load failed",
         exc_info=True,
     )
 

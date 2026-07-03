@@ -469,8 +469,9 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 3;
-    align-items: center;
-    gap: 0.35em;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3em;
     padding: 0.25em 0.45em;
     border-radius: 0.35em;
     background: rgba(0, 0, 0, 0.72);
@@ -490,6 +491,51 @@
         var(--forge-en-lora-card-width, 120px) *
             var(--forge-en-lora-weight-max-ratio, 0.92)
     );
+}
+
+.forge-en-lora-weight-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+}
+
+.forge-en-lora-lbw-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+#txt2img_lora_cards .forge-en-lora-lbw-select,
+#img2img_lora_cards .forge-en-lora-lbw-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.15em 0.2em;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 0.25em;
+    background-color: #1e1e1e !important;
+    color: #f5f5f5 !important;
+    color-scheme: dark;
+    font-size: 0.85em;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+#txt2img_lora_cards .forge-en-lora-lbw-select:hover,
+#txt2img_lora_cards .forge-en-lora-lbw-select:focus,
+#img2img_lora_cards .forge-en-lora-lbw-select:hover,
+#img2img_lora_cards .forge-en-lora-lbw-select:focus {
+    background-color: #333333 !important;
+    color: #f5f5f5 !important;
+    border-color: rgba(255, 255, 255, 0.6);
+    outline: none;
+}
+
+#txt2img_lora_cards .forge-en-lora-lbw-select option,
+#img2img_lora_cards .forge-en-lora-lbw-select option {
+    background-color: #1e1e1e;
+    color: #f5f5f5;
 }
 
 #txt2img_lora_cards .card.forge-en-lora-active .forge-en-lora-weight-overlay,

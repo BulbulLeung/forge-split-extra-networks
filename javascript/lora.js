@@ -7,7 +7,7 @@ const FORGE_EN_LORA_TABNAMES = ["txt2img", "img2img"];
 const FORGE_EN_LORA_ACTIVE_CLASS = "forge-en-lora-active";
 const FORGE_EN_LORA_WEIGHT_STEP = 0.1;
 const FORGE_EN_LORA_SYNC_DEBOUNCE_MS = 80;
-const FORGE_EN_LORA_PROMPT_RE = /<lora:([^:>]+):([\d.]+)>/g;
+const FORGE_EN_LORA_TAG_RE = /<lora:([^>]+)>/g;
 
 const forgeEnLoraBound = {
     prompt: Object.create(null),
@@ -16,6 +16,12 @@ const forgeEnLoraBound = {
 };
 const forgeEnLoraSyncTimers = Object.create(null);
 const forgeEnLoraLastPrompt = Object.create(null);
+const forgeEnLoraLbwState = {
+    available: false,
+    lbw_supported: false,
+    presets: [],
+    loadPromise: null,
+};
 
 const FORGE_EN_LORA_WEIGHT_SIZE_PRESETS = {
     small: {
@@ -204,9 +210,73 @@ function forgeEnLoraGetAddSeparator() {
     return " ";
 }
 
+function forgeEnLoraLbwEnabled() {
+    if (typeof opts === "undefined" || opts.forge_en_lora_lbw_enabled == null) {
+        return true;
+    }
+    return !!opts.forge_en_lora_lbw_enabled;
+}
+
+function forgeEnLoraLooksLikeBlockWeight(value) {
+    if (!value) return false;
+    const text = String(value).trim();
+    if (!text) return false;
+    if (text.includes(",")) return true;
+    if (/^lbw=/i.test(text)) return true;
+    const upper = text.toUpperCase();
+    if (forgeEnLoraLbwState.presets.some(function (preset) {
+        return preset.name.toUpperCase() === upper;
+    })) {
+        return true;
+    }
+    return false;
+}
+
+function forgeEnLoraParseTagContent(content) {
+    const parts = String(content || "").split(":");
+    if (parts.length < 2) {
+        return null;
+    }
+
+    const name = parts[0];
+    const weight = parseFloat(parts[1]);
+    if (!name || Number.isNaN(weight)) {
+        return null;
+    }
+
+    let lbw = null;
+    for (let i = 2; i < parts.length; i++) {
+        const part = parts[i];
+        if (/^lbw=/i.test(part)) {
+            lbw = part.slice(4);
+            continue;
+        }
+        if (forgeEnLoraLooksLikeBlockWeight(part)) {
+            lbw = part;
+        }
+    }
+
+    return { name: name, weight: weight, lbw: lbw };
+}
+
+function forgeEnLoraParseEntries(prompt) {
+    const map = new Map();
+    if (!prompt) return map;
+
+    const re = new RegExp(FORGE_EN_LORA_TAG_RE.source, "g");
+    let match;
+    while ((match = re.exec(prompt)) !== null) {
+        const entry = forgeEnLoraParseTagContent(match[1]);
+        if (entry) {
+            map.set(entry.name, entry);
+        }
+    }
+    return map;
+}
+
 function forgeEnLoraBuildTokenPattern(loraKey) {
     const escaped = forgeEnLoraEscapeRegex(loraKey);
-    return "<lora:" + escaped + ":[\\d.]+>";
+    return "<lora:" + escaped + ":[\\d.]+(?::[^>]+)?>";
 }
 
 function forgeEnLoraPromptContainsLora(prompt, loraKey) {
@@ -451,14 +521,114 @@ function forgeEnLoraGetCardIndex(container, tabname) {
 
 function forgeEnLoraParsePrompt(prompt) {
     const map = new Map();
-    if (!prompt) return map;
-
-    const re = new RegExp(FORGE_EN_LORA_PROMPT_RE.source, "g");
-    let m;
-    while ((m = re.exec(prompt)) !== null) {
-        map.set(m[1], parseFloat(m[2]));
-    }
+    forgeEnLoraParseEntries(prompt).forEach(function (entry, key) {
+        map.set(key, entry.weight);
+    });
     return map;
+}
+
+function forgeEnLoraLbwUiEnabled() {
+    return (
+        forgeEnLoraLbwEnabled() &&
+        forgeEnLoraLbwState.available &&
+        forgeEnLoraLbwState.lbw_supported &&
+        forgeEnLoraLbwState.presets.length > 0
+    );
+}
+
+function forgeEnLoraFindPresetNameByLbw(lbwValue) {
+    if (!lbwValue) return "";
+    const upper = String(lbwValue).trim().toUpperCase();
+    const found = forgeEnLoraLbwState.presets.find(function (preset) {
+        return preset.name.toUpperCase() === upper;
+    });
+    return found ? found.name : "";
+}
+
+function forgeEnLoraLbwSelectValueFromEntry(entry) {
+    if (!entry || !entry.lbw) {
+        return "";
+    }
+    const lbw = String(entry.lbw).trim();
+    if (!lbw || lbw.includes(",")) {
+        return "";
+    }
+    return forgeEnLoraFindPresetNameByLbw(lbw);
+}
+
+function forgeEnLoraFormatLbwDisplay(lbw) {
+    if (!lbw) return "";
+    const text = String(lbw).trim();
+    if (!text) return "";
+    if (!text.includes(",")) {
+        return text;
+    }
+    if (text.length <= 12) {
+        return text;
+    }
+    return text.slice(0, 10) + "\u2026";
+}
+
+function forgeEnLoraApplyPromptEdit(tabname, textarea, newPrompt) {
+    textarea.value = newPrompt;
+    if (typeof updateInput === "function") {
+        updateInput(textarea);
+    }
+    if (
+        tabname === "txt2img" &&
+        typeof recalculate_prompts_txt2img === "function"
+    ) {
+        recalculate_prompts_txt2img();
+    } else if (
+        tabname === "img2img" &&
+        typeof recalculate_prompts_img2img === "function"
+    ) {
+        recalculate_prompts_img2img();
+    }
+}
+
+function forgeEnLoraSetLbw(tabname, loraKey, presetChoice) {
+    const textarea = forgeEnLoraGetPromptTextarea(tabname);
+    if (!textarea || !loraKey) return false;
+
+    const prompt = textarea.value || "";
+    const escaped = forgeEnLoraEscapeRegex(loraKey);
+    const re = new RegExp(
+        "<lora:" + escaped + ":([\\d.]+)(?::([^>]+))?>",
+        "g",
+    );
+
+    let found = false;
+    const newPrompt = prompt.replace(
+        re,
+        function (_match, weightStr, tail) {
+            found = true;
+            const weight = forgeEnLoraFormatWeight(parseFloat(weightStr));
+            if (!presetChoice) {
+                return "<lora:" + loraKey + ":" + weight + ">";
+            }
+
+            const presetName = String(presetChoice).trim();
+            if (!presetName) {
+                return "<lora:" + loraKey + ":" + weight + ">";
+            }
+
+            return (
+                "<lora:" +
+                loraKey +
+                ":" +
+                weight +
+                ":lbw=" +
+                presetName +
+                ">"
+            );
+        },
+    );
+
+    if (!found) return false;
+
+    forgeEnLoraApplyPromptEdit(tabname, textarea, newPrompt);
+    return true;
 }
 
 function forgeEnLoraFormatWeight(weight) {
@@ -499,17 +669,20 @@ function forgeEnLoraAdjustWeight(tabname, loraKey, delta) {
     const prompt = textarea.value || "";
     const escaped = forgeEnLoraEscapeRegex(loraKey);
     const re = new RegExp(
-        "(<lora:" + escaped + ":)([\\d.]+)(>)",
+        "(<lora:" + escaped + ":)([\\d.]+)((?::[^>]+)?>)",
         "g",
     );
 
     let found = false;
-    const newPrompt = prompt.replace(re, function (_match, prefix, weightStr, suffix) {
-        found = true;
-        const oldWeight = parseFloat(weightStr);
-        const newWeight = oldWeight + delta;
-        return prefix + forgeEnLoraFormatWeight(newWeight) + suffix;
-    });
+    const newPrompt = prompt.replace(
+        re,
+        function (_match, prefix, weightStr, suffix) {
+            found = true;
+            const oldWeight = parseFloat(weightStr);
+            const newWeight = oldWeight + delta;
+            return prefix + forgeEnLoraFormatWeight(newWeight) + (suffix || ">");
+        },
+    );
 
     if (!found) return false;
 
@@ -520,13 +693,239 @@ function forgeEnLoraAdjustWeight(tabname, loraKey, delta) {
     return true;
 }
 
+function forgeEnLoraLoadLbwPresets() {
+    if (!forgeEnLoraLbwEnabled()) {
+        forgeEnLoraLbwState.available = false;
+        forgeEnLoraLbwState.lbw_supported = false;
+        forgeEnLoraLbwState.presets = [];
+        return Promise.resolve(forgeEnLoraLbwState);
+    }
+    if (forgeEnLoraLbwState.loadPromise) {
+        return forgeEnLoraLbwState.loadPromise;
+    }
+
+    forgeEnLoraLbwState.loadPromise = fetch("/forge-en-lora/lbw/presets")
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            forgeEnLoraLbwState.available = !!(data && data.available);
+            forgeEnLoraLbwState.lbw_supported = !!(data && data.lbw_supported);
+            forgeEnLoraLbwState.presets = Array.isArray(data.presets)
+                ? data.presets
+                : [];
+            if (!forgeEnLoraLbwState.lbw_supported) {
+                forgeEnLoraLbwState.presets = [];
+            }
+            return forgeEnLoraLbwState;
+        })
+        .catch(function () {
+            forgeEnLoraLbwState.available = false;
+            forgeEnLoraLbwState.lbw_supported = false;
+            forgeEnLoraLbwState.presets = [];
+            return forgeEnLoraLbwState;
+        });
+
+    return forgeEnLoraLbwState.loadPromise;
+}
+
+function forgeEnLoraInvalidateLbwSelects() {
+    forgeEnLoraLbwState.loadPromise = null;
+    const app = gradioApp();
+    if (!app) return;
+    app.querySelectorAll(".forge-en-lora-lbw-select").forEach(function (select) {
+        delete select.dataset.forgeEnLoraLbwPopulated;
+    });
+}
+
+function forgeEnLoraPopulateLbwSelect(select, force) {
+    if (!select) return;
+    if (!force && select.dataset.forgeEnLoraLbwPopulated === "1") {
+        return;
+    }
+
+    const preserved = select.value || "";
+    select.innerHTML = "";
+    const noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = "\u2014 none \u2014";
+    select.appendChild(noneOption);
+
+    forgeEnLoraLbwState.presets.forEach(function (preset) {
+        const option = document.createElement("option");
+        option.value = preset.name;
+        option.textContent = preset.name;
+        select.appendChild(option);
+    });
+
+    if (
+        preserved &&
+        Array.from(select.options).some(function (option) {
+            return option.value === preserved;
+        })
+    ) {
+        select.value = preserved;
+    }
+
+    select.dataset.forgeEnLoraLbwPopulated = "1";
+}
+
+function forgeEnLoraSyncAllLbwSelectsFromPrompt() {
+    const app = gradioApp();
+    if (!app) return;
+
+    FORGE_EN_LORA_TABNAMES.forEach(function (tabname) {
+        const textarea = forgeEnLoraGetPromptTextarea(tabname);
+        const prompt = textarea ? textarea.value || "" : "";
+        const entries = forgeEnLoraParseEntries(prompt);
+        const container = app.querySelector("#" + tabname + "_lora_cards");
+        if (!container) return;
+
+        container
+            .querySelectorAll(".card." + FORGE_EN_LORA_ACTIVE_CLASS)
+            .forEach(function (card) {
+                const loraKey = forgeEnLoraKeyFromCard(card);
+                if (!loraKey) return;
+                forgeEnLoraSyncLbwSelect(card, entries.get(loraKey) || null);
+            });
+    });
+}
+
+function forgeEnLoraRefreshAllLbwSelects() {
+    const app = gradioApp();
+    if (!app) return;
+
+    const showLbw = forgeEnLoraLbwUiEnabled();
+    app.querySelectorAll(".forge-en-lora-lbw-row").forEach(function (row) {
+        const select = row.querySelector(".forge-en-lora-lbw-select");
+        if (!showLbw) {
+            row.style.display = "none";
+            if (select) {
+                select.value = "";
+            }
+            return;
+        }
+
+        row.style.display = "";
+        if (select) {
+            forgeEnLoraPopulateLbwSelect(select, true);
+        }
+    });
+    forgeEnLoraSyncAllLbwSelectsFromPrompt();
+}
+
+function forgeEnLoraOnCheckpointContextChange() {
+    forgeEnLoraInvalidateLbwSelects();
+    forgeEnLoraLoadLbwPresets().then(function () {
+        forgeEnLoraRefreshAllLbwSelects();
+        forgeEnLoraSyncAllHighlights();
+    });
+}
+
+function forgeEnLoraBindCheckpointListeners() {
+    const app = gradioApp();
+    if (!app) return;
+
+    const checkpointEl = app.querySelector("#setting_sd_model_checkpoint");
+    if (checkpointEl && checkpointEl.dataset.forgeEnLoraLbwBound !== "1") {
+        checkpointEl.dataset.forgeEnLoraLbwBound = "1";
+        checkpointEl.addEventListener("change", forgeEnLoraOnCheckpointContextChange);
+        checkpointEl.addEventListener("input", forgeEnLoraOnCheckpointContextChange);
+    }
+
+    const presetEl = app.querySelector("#forge_ui_preset");
+    if (presetEl && presetEl.dataset.forgeEnLoraLbwBound !== "1") {
+        presetEl.dataset.forgeEnLoraLbwBound = "1";
+        presetEl.addEventListener("change", forgeEnLoraOnCheckpointContextChange);
+    }
+}
+
+function forgeEnLoraEnsureLbwRow(overlay, card, tabname) {
+    if (!forgeEnLoraLbwUiEnabled()) {
+        const existing = overlay.querySelector(".forge-en-lora-lbw-row");
+        if (existing) {
+            existing.style.display = "none";
+        }
+        return null;
+    }
+
+    let row = overlay.querySelector(".forge-en-lora-lbw-row");
+    if (row) {
+        row.style.display = "";
+        return row;
+    }
+
+    row = document.createElement("div");
+    row.className = "forge-en-lora-lbw-row";
+
+    const select = document.createElement("select");
+    select.className = "forge-en-lora-lbw-select";
+    select.title =
+        "LoRA Block Weight preset (enable LoRA Block Weight in Scripts panel)";
+    forgeEnLoraPopulateLbwSelect(select);
+
+    select.addEventListener("mousedown", function (event) {
+        event.stopPropagation();
+    });
+    select.addEventListener("click", function (event) {
+        event.stopPropagation();
+    });
+    select.addEventListener("change", function (event) {
+        event.stopPropagation();
+
+        const container = card.closest('[id$="_lora_cards"]');
+        const resolvedTabname =
+            tabname || forgeEnLoraTabnameFromContainer(container);
+        const loraKey = forgeEnLoraKeyFromCard(card);
+        if (!resolvedTabname || !loraKey) return;
+
+        if (forgeEnLoraSetLbw(resolvedTabname, loraKey, select.value)) {
+            forgeEnLoraSyncHighlights(resolvedTabname);
+        }
+    });
+
+    row.appendChild(select);
+    overlay.appendChild(row);
+    return row;
+}
+
+function forgeEnLoraSyncLbwSelect(card, entry) {
+    const select = card.querySelector(".forge-en-lora-lbw-select");
+    if (!select) return;
+
+    const value = forgeEnLoraLbwSelectValueFromEntry(entry);
+    if (select.value !== value) {
+        select.value = value;
+    }
+
+    if (entry && entry.lbw && entry.lbw.includes(",")) {
+        select.title =
+            "Custom block weights: " +
+            forgeEnLoraFormatLbwDisplay(entry.lbw) +
+            " (edit in prompt)";
+    } else {
+        select.title =
+            "LoRA Block Weight preset (enable LoRA Block Weight in Scripts panel)";
+    }
+}
+
 function forgeEnLoraEnsureWeightOverlay(card, tabname) {
     if (card.dataset.forgeEnLoraOverlayBound === "1") {
-        return card.querySelector(".forge-en-lora-weight-overlay");
+        const overlay = card.querySelector(".forge-en-lora-weight-overlay");
+        if (overlay && forgeEnLoraLbwUiEnabled()) {
+            forgeEnLoraEnsureLbwRow(overlay, card, tabname);
+        }
+        return overlay;
     }
 
     const overlay = document.createElement("div");
     overlay.className = "forge-en-lora-weight-overlay";
+
+    const weightRow = document.createElement("div");
+    weightRow.className = "forge-en-lora-weight-row";
 
     const minusBtn = document.createElement("button");
     minusBtn.type = "button";
@@ -544,11 +943,16 @@ function forgeEnLoraEnsureWeightOverlay(card, tabname) {
     plusBtn.textContent = "+";
     plusBtn.title = "Increase weight by " + FORGE_EN_LORA_WEIGHT_STEP;
 
-    overlay.appendChild(minusBtn);
-    overlay.appendChild(valueEl);
-    overlay.appendChild(plusBtn);
+    weightRow.appendChild(minusBtn);
+    weightRow.appendChild(valueEl);
+    weightRow.appendChild(plusBtn);
+    overlay.appendChild(weightRow);
     card.appendChild(overlay);
     forgeEnLoraBindOverlayScale(card);
+
+    if (forgeEnLoraLbwUiEnabled()) {
+        forgeEnLoraEnsureLbwRow(overlay, card, tabname);
+    }
 
     function onWeightButtonClick(event, delta) {
         event.preventDefault();
@@ -576,7 +980,16 @@ function forgeEnLoraEnsureWeightOverlay(card, tabname) {
     return overlay;
 }
 
-function forgeEnLoraSetCardActive(card, tabname, weight) {
+function forgeEnLoraSetCardActive(card, tabname, entry) {
+    const weight =
+        typeof entry === "number"
+            ? entry
+            : entry && typeof entry.weight === "number"
+              ? entry.weight
+              : 1.0;
+    const lbwEntry =
+        entry && typeof entry === "object" && "weight" in entry ? entry : null;
+
     card.classList.add(FORGE_EN_LORA_ACTIVE_CLASS);
     forgeEnLoraApplyOverlayScale(card);
     const overlay = forgeEnLoraEnsureWeightOverlay(card, tabname);
@@ -586,6 +999,7 @@ function forgeEnLoraSetCardActive(card, tabname, weight) {
     if (valueEl) {
         valueEl.textContent = forgeEnLoraFormatWeight(weight);
     }
+    forgeEnLoraSyncLbwSelect(card, lbwEntry);
 }
 
 function forgeEnLoraSetCardInactive(card) {
@@ -593,6 +1007,10 @@ function forgeEnLoraSetCardInactive(card) {
     const valueEl = card.querySelector(".forge-en-lora-weight-value");
     if (valueEl) {
         valueEl.textContent = "";
+    }
+    const select = card.querySelector(".forge-en-lora-lbw-select");
+    if (select) {
+        select.value = "";
     }
 }
 
@@ -606,26 +1024,29 @@ function forgeEnLoraSyncHighlights(tabname) {
     const textarea = forgeEnLoraGetPromptTextarea(tabname);
     const prompt = textarea ? textarea.value || "" : "";
     if (forgeEnLoraLastPrompt[tabname] === prompt) {
+        if (prompt.indexOf("<lora:") !== -1) {
+            forgeEnLoraSyncAllLbwSelectsFromPrompt();
+        }
         return;
     }
     forgeEnLoraLastPrompt[tabname] = prompt;
-    const loraWeights = forgeEnLoraParsePrompt(prompt);
+    const loraEntries = forgeEnLoraParseEntries(prompt);
     const cardIndex = forgeEnLoraGetCardIndex(container, tabname);
 
     container
         .querySelectorAll(".card." + FORGE_EN_LORA_ACTIVE_CLASS)
         .forEach(function (card) {
             const loraKey = forgeEnLoraKeyFromCard(card);
-            if (!loraKey || loraWeights.has(loraKey)) {
+            if (!loraKey || loraEntries.has(loraKey)) {
                 return;
             }
             forgeEnLoraSetCardInactive(card);
         });
 
-    loraWeights.forEach(function (weight, loraKey) {
+    loraEntries.forEach(function (entry, loraKey) {
         const card = cardIndex.get(loraKey);
         if (!card) return;
-        forgeEnLoraSetCardActive(card, tabname, weight);
+        forgeEnLoraSetCardActive(card, tabname, entry);
     });
 
     if (typeof forgeEnEnabledFilterReapply === "function") {
@@ -689,13 +1110,22 @@ function forgeEnLoraSetup() {
     forgeEnLoraApplyWeightButtonSize();
     forgeEnLoraBindPromptListeners();
     forgeEnLoraBindCardContainers();
+    forgeEnLoraBindCheckpointListeners();
+    forgeEnLoraLoadLbwPresets().then(function () {
+        forgeEnLoraRefreshAllLbwSelects();
+        forgeEnLoraSyncAllHighlights();
+    });
 }
 
 function forgeEnLoraOnAfterUiUpdate() {
     FORGE_EN_LORA_TABNAMES.forEach(forgeEnLoraInvalidateCardIndex);
     forgeEnLoraBindPromptListeners();
     forgeEnLoraBindCardContainers();
-    forgeEnLoraSyncAllHighlights();
+    forgeEnLoraBindCheckpointListeners();
+    forgeEnLoraLoadLbwPresets().then(function () {
+        forgeEnLoraRefreshAllLbwSelects();
+        forgeEnLoraSyncAllHighlights();
+    });
 }
 
 if (typeof onUiLoaded === "function") {
@@ -713,5 +1143,8 @@ if (typeof onAfterUiUpdate === "function") {
 }
 
 if (typeof onOptionsChanged === "function") {
-    onOptionsChanged(forgeEnLoraApplyWeightButtonSize);
+    onOptionsChanged(function () {
+        forgeEnLoraApplyWeightButtonSize();
+        forgeEnLoraOnCheckpointContextChange();
+    });
 }
