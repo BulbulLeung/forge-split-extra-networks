@@ -1284,6 +1284,22 @@ function forgeEnPromptApplyTextarea(tabname, textarea, text, caretOpts) {
     forgeEnPromptSyncTags(tabname, true);
 }
 
+function forgeEnPromptInsertNewlineBefore(tabname, index) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const insertAt = Math.min(Math.max(0, index), parts.length);
+    parts.splice(insertAt, 0, FORGE_EN_PROMPT_NEWLINE_MARKER);
+    const caret = forgeEnPromptOffsetForPartsPrefix(parts, insertAt + 1);
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "caretLineIfNeeded" },
+    );
+}
+
 function forgeEnPromptInsertNewlineAfter(tabname, index) {
     const textarea = forgeEnPromptGetTextarea(tabname);
     if (!textarea) return;
@@ -1297,6 +1313,34 @@ function forgeEnPromptInsertNewlineAfter(tabname, index) {
         textarea,
         forgeEnPromptJoinParts(parts),
         { caret: caret, scroll: "caretLineIfNeeded" },
+    );
+}
+
+function forgeEnPromptInsertBefore(tabname, index, newText) {
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) return;
+
+    const trimmed = (newText || "").trim();
+    if (!trimmed) return;
+
+    if (trimmed === "\\n") {
+        forgeEnPromptInsertNewlineBefore(tabname, index);
+        return;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const insertAt = Math.min(Math.max(0, index), parts.length);
+    const expanded = forgeEnPromptExpandBracePart(trimmed);
+    parts.splice(insertAt, 0, ...expanded);
+    const caret = forgeEnPromptOffsetForPartsPrefix(
+        parts,
+        insertAt + expanded.length,
+    );
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
     );
 }
 
@@ -1749,6 +1793,80 @@ function forgeEnPromptShouldHandleTagKeyboard(event) {
     return !!forgeEnPromptGetActivePromptTabname();
 }
 
+function forgeEnPromptInsertFromQuickKey(tabname, key, selectedIndices) {
+    if (!selectedIndices || selectedIndices.length === 0) {
+        return false;
+    }
+
+    let minIdx = selectedIndices[0];
+    let maxIdx = selectedIndices[0];
+    selectedIndices.forEach(function (index) {
+        if (index < minIdx) {
+            minIdx = index;
+        }
+        if (index > maxIdx) {
+            maxIdx = index;
+        }
+    });
+
+    forgeEnPromptHideTagTooltip();
+
+    if (key === "{") {
+        forgeEnPromptInsertBefore(tabname, minIdx, "{");
+        return true;
+    }
+    if (key === "}") {
+        forgeEnPromptInsertAfter(tabname, maxIdx, "}");
+        return true;
+    }
+    if (key === "|") {
+        forgeEnPromptInsertAfter(tabname, maxIdx, "|");
+        return true;
+    }
+    if (key === "b" || key === "B") {
+        forgeEnPromptInsertAfter(tabname, maxIdx, "BREAK");
+        return true;
+    }
+    if (key === "n" || key === "N") {
+        forgeEnPromptInsertAfter(tabname, maxIdx, "\\n");
+        return true;
+    }
+    return false;
+}
+
+function forgeEnPromptHandleQuickInsertKey(event) {
+    if (forgeEnPromptIsEditableTarget(event.target)) {
+        return false;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+        return false;
+    }
+    if (forgeEnPromptIsInsertPopoverOpen()) {
+        return false;
+    }
+
+    const tabname = forgeEnPromptGetActivePromptTabname();
+    if (!tabname) {
+        return false;
+    }
+
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    if (!container) {
+        return false;
+    }
+
+    const selectedIndices = forgeEnPromptGetSelectedIndices(container);
+    if (selectedIndices.length === 0) {
+        return false;
+    }
+
+    return forgeEnPromptInsertFromQuickKey(
+        tabname,
+        event.key,
+        selectedIndices,
+    );
+}
+
 function forgeEnPromptKeyHandler(event) {
     if (event.key === "Delete" || event.key === "Del") {
         if (forgeEnPromptIsEditableTarget(event.target)) {
@@ -1769,6 +1887,12 @@ function forgeEnPromptKeyHandler(event) {
             event.preventDefault();
             event.stopPropagation();
         }
+        return;
+    }
+
+    if (forgeEnPromptHandleQuickInsertKey(event)) {
+        event.preventDefault();
+        event.stopPropagation();
         return;
     }
 

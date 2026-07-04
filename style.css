@@ -941,13 +941,23 @@
 #img2img_en_prompt_pane .forge-en-prompt-tag--brace-open:not(.forge-en-output-selected),
 #txt2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected),
 #img2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected) {
-    border-color: rgba(181, 124, 255, 0.55);
-    color: rgba(181, 124, 255, 0.95);
+    background-color: rgba(181, 124, 255, 0.85);
+    border-color: transparent;
+    color: #ffffff;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-weight: 600;
     min-width: 2.25rem;
     padding-left: 0.65rem;
     padding-right: 0.65rem;
+}
+
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-open:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-open:not(.forge-en-output-selected):hover,
+#txt2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected):hover,
+#img2img_en_prompt_pane .forge-en-prompt-tag--brace-close:not(.forge-en-output-selected):hover {
+    background-color: rgba(181, 124, 255, 0.95);
+    border-color: transparent;
+    color: #ffffff;
 }
 
 #txt2img_en_prompt_pane .forge-en-prompt-tag--brace-open-unclosed:not(.forge-en-output-selected),
