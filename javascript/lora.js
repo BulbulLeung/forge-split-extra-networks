@@ -19,8 +19,11 @@ const forgeEnLoraLastPrompt = Object.create(null);
 const forgeEnLoraLbwState = {
     available: false,
     lbw_supported: false,
+    lbw_message: "",
     presets: [],
     loadPromise: null,
+    loadUrl: null,
+    loadGeneration: 0,
 };
 
 const FORGE_EN_LORA_WEIGHT_SIZE_PRESETS = {
@@ -527,10 +530,16 @@ function forgeEnLoraParsePrompt(prompt) {
     return map;
 }
 
-function forgeEnLoraLbwUiEnabled() {
+function forgeEnLoraLbwRowEnabled() {
     return (
         forgeEnLoraLbwEnabled() &&
-        forgeEnLoraLbwState.available &&
+        forgeEnLoraLbwState.available
+    );
+}
+
+function forgeEnLoraLbwUiEnabled() {
+    return (
+        forgeEnLoraLbwRowEnabled() &&
         forgeEnLoraLbwState.lbw_supported &&
         forgeEnLoraLbwState.presets.length > 0
     );
@@ -693,18 +702,106 @@ function forgeEnLoraAdjustWeight(tabname, loraKey, delta) {
     return true;
 }
 
+function forgeEnLoraGetForgePresetFromUi(app) {
+    const root = (app || gradioApp())?.querySelector("#forge_ui_preset");
+    if (!root) {
+        return "";
+    }
+
+    const inputs = root.querySelectorAll("input");
+    for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i];
+        if (input.type === "radio" || input.type === "checkbox") {
+            if (input.checked) {
+                return String(input.value || "").trim();
+            }
+            continue;
+        }
+        const value = String(input.value || "").trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    const selected = root.querySelector('[aria-selected="true"]');
+    if (selected) {
+        return String(
+            selected.dataset.value || selected.textContent || "",
+        ).trim();
+    }
+
+    return "";
+}
+
+function forgeEnLoraGetCheckpointFromUi(app) {
+    const root = (app || gradioApp())?.querySelector(
+        "#setting_sd_model_checkpoint",
+    );
+    if (!root) {
+        return "";
+    }
+
+    const inputs = root.querySelectorAll("input");
+    for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i];
+        if (input.type === "radio" || input.type === "checkbox") {
+            if (input.checked) {
+                return String(input.value || "").trim();
+            }
+            continue;
+        }
+        const value = String(input.value || "").trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
+}
+
+function forgeEnLoraGetForgeContextFromUi() {
+    const app = gradioApp();
+    if (!app) {
+        return { forge_preset: "", checkpoint: "" };
+    }
+    return {
+        forge_preset: forgeEnLoraGetForgePresetFromUi(app),
+        checkpoint: forgeEnLoraGetCheckpointFromUi(app),
+    };
+}
+
+function forgeEnLoraBuildLbwPresetsUrl() {
+    const ctx = forgeEnLoraGetForgeContextFromUi();
+    const params = new URLSearchParams();
+    if (ctx.forge_preset) {
+        params.set("forge_preset", ctx.forge_preset);
+    }
+    if (ctx.checkpoint) {
+        params.set("checkpoint", ctx.checkpoint);
+    }
+    const qs = params.toString();
+    return "/forge-en-lora/lbw/presets" + (qs ? "?" + qs : "");
+}
+
 function forgeEnLoraLoadLbwPresets() {
     if (!forgeEnLoraLbwEnabled()) {
         forgeEnLoraLbwState.available = false;
         forgeEnLoraLbwState.lbw_supported = false;
+        forgeEnLoraLbwState.lbw_message = "";
         forgeEnLoraLbwState.presets = [];
         return Promise.resolve(forgeEnLoraLbwState);
     }
-    if (forgeEnLoraLbwState.loadPromise) {
+
+    const generation = ++forgeEnLoraLbwState.loadGeneration;
+    const requestUrl = forgeEnLoraBuildLbwPresetsUrl();
+    if (
+        forgeEnLoraLbwState.loadPromise &&
+        forgeEnLoraLbwState.loadUrl === requestUrl
+    ) {
         return forgeEnLoraLbwState.loadPromise;
     }
-
-    forgeEnLoraLbwState.loadPromise = fetch("/forge-en-lora/lbw/presets")
+    forgeEnLoraLbwState.loadUrl = requestUrl;
+    forgeEnLoraLbwState.loadPromise = fetch(requestUrl)
         .then(function (response) {
             if (!response.ok) {
                 throw new Error("HTTP " + response.status);
@@ -712,12 +809,17 @@ function forgeEnLoraLoadLbwPresets() {
             return response.json();
         })
         .then(function (data) {
+            if (generation !== forgeEnLoraLbwState.loadGeneration) {
+                return forgeEnLoraLbwState;
+            }
             forgeEnLoraLbwState.available = !!(data && data.available);
             forgeEnLoraLbwState.lbw_supported = !!(data && data.lbw_supported);
+            forgeEnLoraLbwState.lbw_message =
+                data && data.lbw_message ? String(data.lbw_message) : "";
             forgeEnLoraLbwState.presets = Array.isArray(data.presets)
                 ? data.presets
                 : [];
-            if (!forgeEnLoraLbwState.lbw_supported) {
+            if (!forgeEnLoraLbwState.lbw_supported || !forgeEnLoraLbwState.available) {
                 forgeEnLoraLbwState.presets = [];
             }
             return forgeEnLoraLbwState;
@@ -725,6 +827,7 @@ function forgeEnLoraLoadLbwPresets() {
         .catch(function () {
             forgeEnLoraLbwState.available = false;
             forgeEnLoraLbwState.lbw_supported = false;
+            forgeEnLoraLbwState.lbw_message = "";
             forgeEnLoraLbwState.presets = [];
             return forgeEnLoraLbwState;
         });
@@ -733,7 +836,9 @@ function forgeEnLoraLoadLbwPresets() {
 }
 
 function forgeEnLoraInvalidateLbwSelects() {
+    forgeEnLoraLbwState.loadGeneration += 1;
     forgeEnLoraLbwState.loadPromise = null;
+    forgeEnLoraLbwState.loadUrl = null;
     const app = gradioApp();
     if (!app) return;
     app.querySelectorAll(".forge-en-lora-lbw-select").forEach(function (select) {
@@ -798,23 +903,51 @@ function forgeEnLoraRefreshAllLbwSelects() {
     const app = gradioApp();
     if (!app) return;
 
-    const showLbw = forgeEnLoraLbwUiEnabled();
+    const showRow = forgeEnLoraLbwRowEnabled();
+    const showSelect = forgeEnLoraLbwUiEnabled();
     app.querySelectorAll(".forge-en-lora-lbw-row").forEach(function (row) {
         const select = row.querySelector(".forge-en-lora-lbw-select");
-        if (!showLbw) {
+        const empty = row.querySelector(".forge-en-lora-lbw-empty");
+        if (!showRow) {
             row.style.display = "none";
             if (select) {
                 select.value = "";
+            }
+            if (empty) {
+                empty.textContent = "";
             }
             return;
         }
 
         row.style.display = "";
         if (select) {
-            forgeEnLoraPopulateLbwSelect(select, true);
+            select.style.display = showSelect ? "" : "none";
+            if (showSelect) {
+                forgeEnLoraPopulateLbwSelect(select, true);
+            } else {
+                select.value = "";
+            }
+        }
+        if (empty) {
+            empty.textContent = showSelect
+                ? ""
+                : forgeEnLoraLbwState.lbw_message || "NO LBW Data";
+            empty.style.display = showSelect ? "none" : "";
         }
     });
     forgeEnLoraSyncAllLbwSelectsFromPrompt();
+}
+
+function forgeEnLoraScheduleContextChange() {
+    if (typeof forgeEnDebounceByKey === "function") {
+        forgeEnDebounceByKey(
+            "forge_en_lora_lbw_context",
+            120,
+            forgeEnLoraOnCheckpointContextChange,
+        );
+        return;
+    }
+    forgeEnLoraOnCheckpointContextChange();
 }
 
 function forgeEnLoraOnCheckpointContextChange() {
@@ -825,26 +958,37 @@ function forgeEnLoraOnCheckpointContextChange() {
     });
 }
 
+function forgeEnLoraBindGradioInputListener(root, dataKey) {
+    if (!root || root.dataset[dataKey] === "1") {
+        return;
+    }
+    const inputs = root.querySelectorAll("input");
+    if (!inputs.length) {
+        return;
+    }
+    root.dataset[dataKey] = "1";
+    inputs.forEach(function (input) {
+        input.addEventListener("change", forgeEnLoraScheduleContextChange);
+        input.addEventListener("input", forgeEnLoraScheduleContextChange);
+    });
+}
+
 function forgeEnLoraBindCheckpointListeners() {
     const app = gradioApp();
     if (!app) return;
 
-    const checkpointEl = app.querySelector("#setting_sd_model_checkpoint");
-    if (checkpointEl && checkpointEl.dataset.forgeEnLoraLbwBound !== "1") {
-        checkpointEl.dataset.forgeEnLoraLbwBound = "1";
-        checkpointEl.addEventListener("change", forgeEnLoraOnCheckpointContextChange);
-        checkpointEl.addEventListener("input", forgeEnLoraOnCheckpointContextChange);
-    }
-
-    const presetEl = app.querySelector("#forge_ui_preset");
-    if (presetEl && presetEl.dataset.forgeEnLoraLbwBound !== "1") {
-        presetEl.dataset.forgeEnLoraLbwBound = "1";
-        presetEl.addEventListener("change", forgeEnLoraOnCheckpointContextChange);
-    }
+    forgeEnLoraBindGradioInputListener(
+        app.querySelector("#setting_sd_model_checkpoint"),
+        "forgeEnLoraLbwBound",
+    );
+    forgeEnLoraBindGradioInputListener(
+        app.querySelector("#forge_ui_preset"),
+        "forgeEnLoraLbwPresetBound",
+    );
 }
 
 function forgeEnLoraEnsureLbwRow(overlay, card, tabname) {
-    if (!forgeEnLoraLbwUiEnabled()) {
+    if (!forgeEnLoraLbwRowEnabled()) {
         const existing = overlay.querySelector(".forge-en-lora-lbw-row");
         if (existing) {
             existing.style.display = "none";
@@ -855,6 +999,7 @@ function forgeEnLoraEnsureLbwRow(overlay, card, tabname) {
     let row = overlay.querySelector(".forge-en-lora-lbw-row");
     if (row) {
         row.style.display = "";
+        forgeEnLoraRefreshAllLbwSelects();
         return row;
     }
 
@@ -865,7 +1010,6 @@ function forgeEnLoraEnsureLbwRow(overlay, card, tabname) {
     select.className = "forge-en-lora-lbw-select";
     select.title =
         "LoRA Block Weight preset (enable LoRA Block Weight in Scripts panel)";
-    forgeEnLoraPopulateLbwSelect(select);
 
     select.addEventListener("mousedown", function (event) {
         event.stopPropagation();
@@ -887,35 +1031,44 @@ function forgeEnLoraEnsureLbwRow(overlay, card, tabname) {
         }
     });
 
+    const empty = document.createElement("div");
+    empty.className = "forge-en-lora-lbw-empty";
+
     row.appendChild(select);
+    row.appendChild(empty);
     overlay.appendChild(row);
+    forgeEnLoraRefreshAllLbwSelects();
     return row;
 }
 
 function forgeEnLoraSyncLbwSelect(card, entry) {
     const select = card.querySelector(".forge-en-lora-lbw-select");
-    if (!select) return;
+    const empty = card.querySelector(".forge-en-lora-lbw-empty");
+    if (!select && !empty) return;
 
     const value = forgeEnLoraLbwSelectValueFromEntry(entry);
-    if (select.value !== value) {
+    if (select && select.value !== value) {
         select.value = value;
     }
 
-    if (entry && entry.lbw && entry.lbw.includes(",")) {
+    if (select && entry && entry.lbw && entry.lbw.includes(",")) {
         select.title =
             "Custom block weights: " +
             forgeEnLoraFormatLbwDisplay(entry.lbw) +
             " (edit in prompt)";
-    } else {
+    } else if (select) {
         select.title =
             "LoRA Block Weight preset (enable LoRA Block Weight in Scripts panel)";
+    }
+    if (empty && empty.style.display !== "none" && !empty.textContent) {
+        empty.textContent = forgeEnLoraLbwState.lbw_message || "NO LBW Data";
     }
 }
 
 function forgeEnLoraEnsureWeightOverlay(card, tabname) {
     if (card.dataset.forgeEnLoraOverlayBound === "1") {
         const overlay = card.querySelector(".forge-en-lora-weight-overlay");
-        if (overlay && forgeEnLoraLbwUiEnabled()) {
+        if (overlay && forgeEnLoraLbwRowEnabled()) {
             forgeEnLoraEnsureLbwRow(overlay, card, tabname);
         }
         return overlay;
@@ -950,7 +1103,7 @@ function forgeEnLoraEnsureWeightOverlay(card, tabname) {
     card.appendChild(overlay);
     forgeEnLoraBindOverlayScale(card);
 
-    if (forgeEnLoraLbwUiEnabled()) {
+    if (forgeEnLoraLbwRowEnabled()) {
         forgeEnLoraEnsureLbwRow(overlay, card, tabname);
     }
 
@@ -1011,6 +1164,10 @@ function forgeEnLoraSetCardInactive(card) {
     const select = card.querySelector(".forge-en-lora-lbw-select");
     if (select) {
         select.value = "";
+    }
+    const empty = card.querySelector(".forge-en-lora-lbw-empty");
+    if (empty) {
+        empty.textContent = forgeEnLoraLbwState.lbw_message || "NO LBW Data";
     }
 }
 
@@ -1103,10 +1260,26 @@ function forgeEnLoraBindPromptListeners() {
     });
 }
 
+function forgeEnLoraInstallPresetHooks() {
+    if (window.forgeEnLoraPresetHooksInstalled === "1") {
+        return;
+    }
+    window.forgeEnLoraPresetHooksInstalled = "1";
+
+    const previousClickLoraRefresh = window.clickLoraRefresh;
+    window.clickLoraRefresh = function () {
+        if (typeof previousClickLoraRefresh === "function") {
+            previousClickLoraRefresh();
+        }
+        forgeEnLoraScheduleContextChange();
+    };
+}
+
 function forgeEnLoraSetup() {
     if (typeof forgeEnOutputBrowserApplySelectionStyle === "function") {
         forgeEnOutputBrowserApplySelectionStyle();
     }
+    forgeEnLoraInstallPresetHooks();
     forgeEnLoraApplyWeightButtonSize();
     forgeEnLoraBindPromptListeners();
     forgeEnLoraBindCardContainers();
@@ -1122,10 +1295,7 @@ function forgeEnLoraOnAfterUiUpdate() {
     forgeEnLoraBindPromptListeners();
     forgeEnLoraBindCardContainers();
     forgeEnLoraBindCheckpointListeners();
-    forgeEnLoraLoadLbwPresets().then(function () {
-        forgeEnLoraRefreshAllLbwSelects();
-        forgeEnLoraSyncAllHighlights();
-    });
+    forgeEnLoraScheduleContextChange();
 }
 
 if (typeof onUiLoaded === "function") {
@@ -1145,6 +1315,6 @@ if (typeof onAfterUiUpdate === "function") {
 if (typeof onOptionsChanged === "function") {
     onOptionsChanged(function () {
         forgeEnLoraApplyWeightButtonSize();
-        forgeEnLoraOnCheckpointContextChange();
+        forgeEnLoraScheduleContextChange();
     });
 }

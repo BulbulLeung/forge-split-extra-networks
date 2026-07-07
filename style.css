@@ -507,6 +507,22 @@
     width: 100%;
 }
 
+#txt2img_lora_cards .forge-en-lora-lbw-empty,
+#img2img_lora_cards .forge-en-lora-lbw-empty {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.2em 0.25em;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.25em;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgba(245, 245, 245, 0.72);
+    font-size: 0.85em;
+    line-height: 1.2;
+    text-align: center;
+    box-sizing: border-box;
+    cursor: default;
+}
+
 #txt2img_lora_cards .forge-en-lora-lbw-select,
 #img2img_lora_cards .forge-en-lora-lbw-select {
     width: 100%;

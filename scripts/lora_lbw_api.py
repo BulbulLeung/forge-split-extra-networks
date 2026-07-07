@@ -79,7 +79,7 @@ def resolve_lbw_archs(forge_preset: str, checkpoint_name: str) -> list[str]:
     preset = (forge_preset or "").strip().lower()
     ckpt = (checkpoint_name or "").strip().lower()
 
-    if preset in ("sd", "xl"):
+    if preset in ("sd", "xl", "krea"):
         return ["sdxl"]
     if preset == "flux":
         return ["flux"]
@@ -101,12 +101,14 @@ def _current_forge_context() -> tuple[str, str]:
 def _empty_lbw_payload(*, available: bool = False) -> dict:
     forge_preset, checkpoint_name = _current_forge_context()
     lbw_archs = resolve_lbw_archs(forge_preset, checkpoint_name)
+    lbw_supported = bool(lbw_archs)
     return {
         "available": available,
         "forge_preset": forge_preset,
         "checkpoint": checkpoint_name,
         "lbw_archs": lbw_archs,
-        "lbw_supported": bool(lbw_archs),
+        "lbw_supported": lbw_supported,
+        "lbw_message": "" if lbw_supported else "NO LBW Data",
         "presets": [],
     }
 
@@ -139,8 +141,16 @@ def _collect_all_presets(module) -> list[dict]:
     return presets
 
 
-def get_lbw_presets_payload() -> dict:
-    forge_preset, checkpoint_name = _current_forge_context()
+def get_lbw_presets_payload(
+    forge_preset: str | None = None,
+    checkpoint_name: str | None = None,
+) -> dict:
+    ctx_preset, ctx_checkpoint = _current_forge_context()
+    if forge_preset is not None and str(forge_preset).strip():
+        ctx_preset = str(forge_preset).strip()
+    if checkpoint_name is not None and str(checkpoint_name).strip():
+        ctx_checkpoint = str(checkpoint_name).strip()
+    forge_preset, checkpoint_name = ctx_preset, ctx_checkpoint
     lbw_archs = resolve_lbw_archs(forge_preset, checkpoint_name)
     lbw_supported = bool(lbw_archs)
 
@@ -161,14 +171,18 @@ def get_lbw_presets_payload() -> dict:
         "checkpoint": checkpoint_name,
         "lbw_archs": lbw_archs,
         "lbw_supported": lbw_supported,
+        "lbw_message": "" if lbw_supported else "NO LBW Data",
         "presets": presets,
     }
 
 
 def register_lora_lbw_routes(_: gr.Blocks, app: FastAPI):
     @app.get("/forge-en-lora/lbw/presets")
-    async def get_lbw_presets():
-        return get_lbw_presets_payload()
+    async def get_lbw_presets(forge_preset: str = "", checkpoint: str = ""):
+        return get_lbw_presets_payload(
+            forge_preset=forge_preset or None,
+            checkpoint_name=checkpoint or None,
+        )
 
 
 script_callbacks.on_app_started(
