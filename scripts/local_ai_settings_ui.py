@@ -1,6 +1,13 @@
+import os
+import sys
+
 import gradio as gr
 
 from modules import script_callbacks, shared
+
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 from local_ai_api import discover_local_ai, set_cached_model_choices
 
