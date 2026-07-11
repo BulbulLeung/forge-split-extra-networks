@@ -1811,6 +1811,14 @@ function forgeEnPromptInsertFromQuickKey(tabname, key, selectedIndices) {
 
     forgeEnPromptHideTagTooltip();
 
+    if (
+        (key === "{" || key === "}" || key === "|") &&
+        selectedIndices.length >= 2 &&
+        forgeEnPromptAreIndicesConsecutive(selectedIndices)
+    ) {
+        return forgeEnPromptWrapSelectionInBraces(tabname, selectedIndices);
+    }
+
     if (key === "{") {
         forgeEnPromptInsertBefore(tabname, minIdx, "{");
         return true;
@@ -2032,6 +2040,75 @@ function forgeEnPromptNormalizeSortedIndices(indices) {
         return a - b;
     });
     return sorted;
+}
+
+function forgeEnPromptAreIndicesConsecutive(indices) {
+    const sorted = forgeEnPromptNormalizeSortedIndices(indices);
+    if (sorted.length === 0) {
+        return false;
+    }
+    for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] !== sorted[i - 1] + 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function forgeEnPromptWrapSelectionInBraces(tabname, selectedIndices) {
+    const sorted = forgeEnPromptNormalizeSortedIndices(selectedIndices);
+    if (sorted.length === 0) {
+        return false;
+    }
+
+    const textarea = forgeEnPromptGetTextarea(tabname);
+    if (!textarea) {
+        return false;
+    }
+
+    const parts = forgeEnPromptSplitParts(textarea.value || "");
+    const selectedParts = sorted
+        .filter(function (index) {
+            return index >= 0 && index < parts.length;
+        })
+        .map(function (index) {
+            return parts[index];
+        });
+    if (selectedParts.length === 0) {
+        return false;
+    }
+
+    const wrapped = [FORGE_EN_PROMPT_BRACE_OPEN_MARKER];
+    selectedParts.forEach(function (part, i) {
+        if (i > 0) {
+            wrapped.push(FORGE_EN_PROMPT_BRACE_ALT_MARKER);
+        }
+        wrapped.push(part);
+    });
+    wrapped.push(FORGE_EN_PROMPT_BRACE_CLOSE_MARKER);
+
+    const minIdx = sorted[0];
+    parts.splice(minIdx, sorted.length, ...wrapped);
+
+    const container = forgeEnPromptGetTagsContainer(tabname);
+    const newSelection = wrapped.map(function (_part, offset) {
+        return minIdx + offset;
+    });
+    if (container) {
+        forgeEnPromptSetPendingSelection(container, newSelection);
+    }
+
+    const caret = forgeEnPromptOffsetForPartsPrefix(
+        parts,
+        minIdx + wrapped.length,
+    );
+    forgeEnPromptApplyTextarea(
+        tabname,
+        textarea,
+        forgeEnPromptJoinParts(parts),
+        { caret: caret, scroll: "none" },
+    );
+    return true;
 }
 
 function forgeEnPromptGetBlockInsertAt(selectedIndices, dropIndex, insertBefore) {
