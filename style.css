@@ -166,6 +166,23 @@
     max-height: calc(100vh - var(--forge-en-pane-offset-px, 320px));
 }
 
+/* Gen settings bar: Prompt EN tab panel must be a column flex container. */
+#txt2img_en_prompt.forge-en-right-panel,
+#img2img_en_prompt.forge-en-right-panel,
+#txt2img_en_prompt.extra-page,
+#img2img_en_prompt.extra-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#txt2img_en_prompt > #txt2img_en_prompt_cards_html,
+#img2img_en_prompt > #img2img_en_prompt_cards_html {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
 /* Multi-column Extra Networks */
 .forge-en-split.forge-en-multi-column {
     grid-template-columns:
@@ -891,6 +908,186 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+/* Gen settings toolbar: class rule required — bar sits in Gradio wrapper, not pane / direct tab child. */
+.forge-en-gen-settings-bar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 0.35rem 0.5rem 0.5rem;
+    margin: 0;
+    box-sizing: border-box;
+    width: 100%;
+    border-bottom: 1px solid var(--border-color-primary, rgba(128, 128, 128, 0.35));
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-bar,
+#img2img_en_prompt .forge-en-gen-settings-bar,
+#txt2img_en_prompt_pane .forge-en-gen-settings-bar,
+#img2img_en_prompt_pane .forge-en-gen-settings-bar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-combo,
+#img2img_en_prompt .forge-en-gen-settings-combo,
+#txt2img_en_prompt_pane .forge-en-gen-settings-combo,
+#img2img_en_prompt_pane .forge-en-gen-settings-combo {
+    flex: 1 1 12rem;
+    min-width: 10rem;
+    max-width: 20rem;
+    height: 1.9rem;
+    padding: 0 0.45rem;
+    box-sizing: border-box;
+    border: 1px solid var(--input-border-color, var(--border-color-primary, #888));
+    border-radius: var(--button-large-radius, 4px);
+    background: var(--input-background-fill, var(--background-fill-primary, #fff));
+    color: var(--body-text-color, inherit);
+    font-size: 0.85rem;
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-btn,
+#img2img_en_prompt .forge-en-gen-settings-btn,
+#txt2img_en_prompt_pane .forge-en-gen-settings-btn,
+#img2img_en_prompt_pane .forge-en-gen-settings-btn {
+    flex: 0 0 auto;
+    height: 1.9rem;
+    padding: 0 0.65rem;
+    border: 1px solid var(--button-secondary-border-color, var(--border-color-primary, #888));
+    border-radius: var(--button-large-radius, 4px);
+    background: var(--button-secondary-background-fill, var(--background-fill-secondary, #eee));
+    color: var(--button-secondary-text-color, var(--body-text-color, inherit));
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-btn:hover,
+#img2img_en_prompt .forge-en-gen-settings-btn:hover,
+#txt2img_en_prompt_pane .forge-en-gen-settings-btn:hover,
+#img2img_en_prompt_pane .forge-en-gen-settings-btn:hover {
+    filter: brightness(1.05);
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-status,
+#img2img_en_prompt .forge-en-gen-settings-status,
+#txt2img_en_prompt_pane .forge-en-gen-settings-status,
+#img2img_en_prompt_pane .forge-en-gen-settings-status {
+    flex: 1 1 100%;
+    min-height: 1rem;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    color: var(--body-text-color-subdued, var(--body-text-color, inherit));
+}
+
+#txt2img_en_prompt .forge-en-gen-settings-status--error,
+#img2img_en_prompt .forge-en-gen-settings-status--error,
+#txt2img_en_prompt_pane .forge-en-gen-settings-status--error,
+#img2img_en_prompt_pane .forge-en-gen-settings-status--error {
+    color: var(--error-text-color, #c44);
+    opacity: 1;
+}
+
+.forge-en-gen-settings-overwrite {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.forge-en-gen-settings-overwrite__dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: min(52rem, 96vw);
+    max-height: min(80vh, 40rem);
+    padding: 0.85rem 1rem;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color-primary, rgba(128, 128, 128, 0.45));
+    border-radius: var(--block-radius, 8px);
+    background: var(--background-fill-primary, #fff);
+    color: var(--body-text-color, inherit);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+.forge-en-gen-settings-overwrite__title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.forge-en-gen-settings-overwrite__hint {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.forge-en-gen-settings-overwrite__cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.forge-en-gen-settings-overwrite__col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--border-color-primary, rgba(128, 128, 128, 0.35));
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.forge-en-gen-settings-overwrite__col-title {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--background-fill-secondary, rgba(128, 128, 128, 0.12));
+    border-bottom: 1px solid var(--border-color-primary, rgba(128, 128, 128, 0.35));
+}
+
+.forge-en-gen-settings-overwrite__body {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 0.5rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    background: var(--input-background-fill, var(--background-fill-primary, #fff));
+}
+
+.forge-en-gen-settings-overwrite__actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+}
+
+.forge-en-gen-settings-overwrite__actions button {
+    min-width: 5.5rem;
+}
+
+@media (max-width: 720px) {
+    .forge-en-gen-settings-overwrite__cols {
+        grid-template-columns: 1fr;
+    }
 }
 
 #txt2img_en_prompt_pane .forge-en-prompt-tags.extra-network-dirs,

@@ -345,6 +345,14 @@ except Exception:
     )
 
 try:
+    import gen_settings_api  # noqa: F401 — registers on_app_started routes
+except Exception:
+    errors.report(
+        "forge-split-extra-networks: gen_settings_api load failed",
+        exc_info=True,
+    )
+
+try:
     import local_ai_settings_ui  # noqa: F401 — settings detect button
 except Exception:
     errors.report(
