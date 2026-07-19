@@ -1,0 +1,1418 @@
+{
+  "tabname": "txt2img",
+  "name": "Random Lora Training image",
+  "fields": [
+    {
+      "id": "txt2img_prompt",
+      "value": "__00.quality/quality_basic_prompt__, __01.artist style/748_0.7-kuchi_0.8__,\n__06.camera/camera_angle__, __06.camera/cameraanglesTAGS__, __06.camera/cameraView__,\n{ __21.character/99coins_1girl_azur_lane__ | __21.character/99coins_1girl_fate__ | __21.character/99coins_1girl_furry_female__ | __21.character/99coins_1girl_kancolle__ | __21.character/99coins_1girl_touhou__ | __21.character/99coins_1girl_umamusume__ | __21.character/pokegirl_full_clothing__ },\n__04.emotion/face_expression__,  \n{ __05.background/background_asian__ | __05.background/background_city_streets__ | __05.background/background_interiors__ | __05.background/background_school__ | __05.background/background_spaceships__ | __05.background/locations_medieval__ | __05.background/locations_post-apocalyptic__ },\ntsurime,"
+    },
+    {
+      "id": "txt2img_neg_prompt",
+      "value": "__00.quality/negative_prompt__,  __00.quality/negative_eyes_prompt__, "
+    },
+    {
+      "id": "txt2img_sampling",
+      "value": "Euler a"
+    },
+    {
+      "id": "txt2img_scheduler",
+      "value": "Automatic"
+    },
+    {
+      "id": "txt2img_steps",
+      "value": 28
+    },
+    {
+      "id": "txt2img_hr-checkbox",
+      "value": true
+    },
+    {
+      "id": "txt2img_aspect_ratio",
+      "value": "Custom"
+    },
+    {
+      "id": "txt2img_width",
+      "value": 1024
+    },
+    {
+      "id": "txt2img_height",
+      "value": 1024
+    },
+    {
+      "id": "txt2img_distilled_cfg_scale",
+      "value": 9
+    },
+    {
+      "id": "txt2img_cfg_scale",
+      "value": 4.5
+    },
+    {
+      "id": "txt2img_batch_count",
+      "value": 1
+    },
+    {
+      "id": "txt2img_batch_size",
+      "value": 1
+    },
+    {
+      "id": "txt2img_seed",
+      "value": -1
+    },
+    {
+      "id": "txt2img_subseed_show",
+      "value": false
+    },
+    {
+      "id": "txt2img_subseed",
+      "value": -1
+    },
+    {
+      "id": "txt2img_subseed_strength",
+      "value": 0
+    },
+    {
+      "id": "txt2img_seed_resize_from_w",
+      "value": 0
+    },
+    {
+      "id": "txt2img_seed_resize_from_h",
+      "value": 0
+    },
+    {
+      "id": "txt2img_hr_upscaler",
+      "value": "realesrganX4plusAnime_v1"
+    },
+    {
+      "id": "txt2img_hires_steps",
+      "value": 24
+    },
+    {
+      "id": "txt2img_denoising_strength",
+      "value": 0.35
+    },
+    {
+      "id": "txt2img_hr_scale",
+      "value": 1.5
+    },
+    {
+      "id": "txt2img_hr_resize_x",
+      "value": 0
+    },
+    {
+      "id": "txt2img_hr_resize_y",
+      "value": 0
+    },
+    {
+      "id": "txt2img_hr_distilled_cfg",
+      "value": 9
+    },
+    {
+      "id": "txt2img_hr_cfg",
+      "value": 4.5
+    },
+    {
+      "id": "hr_checkpoint",
+      "value": "Use same checkpoint"
+    },
+    {
+      "id": "hr_vae_te",
+      "value": ""
+    },
+    {
+      "id": "hr_sampler",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "hr_scheduler",
+      "value": "Use same scheduler"
+    },
+    {
+      "id": "hires_prompt",
+      "value": ""
+    },
+    {
+      "id": "hires_neg_prompt",
+      "value": ""
+    },
+    {
+      "id": "txt2img_override_settings",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_main_accordion-checkbox",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_skip_img2img",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_tab_enable",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model",
+      "value": "face_yolov9c.pt"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_classes",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_prompt",
+      "value": "__01.artist style/748_0.7-kuchi_0.8__, detailed face, tsurime, "
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_negative_prompt",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_confidence",
+      "value": 0.3
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_min_ratio",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_max_ratio",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_k",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_filter_method",
+      "value": "Area"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_x_offset",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_y_offset",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_dilate_erode",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_merge_invert",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_blur",
+      "value": 8
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_padding",
+      "value": 32
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_noise_multiplier",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_noise_multiplier",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_sampler",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_sampler",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_scheduler",
+      "value": "Use same scheduler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_inpaint_width_height",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_width",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_height",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_steps",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_steps",
+      "value": 20
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_cfg_scale",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_cfg_scale",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_checkpoint",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_checkpoint",
+      "value": "krea2TurboNSFWAIO_v10 [c40a220593]"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_vae",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_vae",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_restore_face",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_denoising_strength",
+      "value": 0.2
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_module",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_model",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_weight",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_guidance_start_end",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_tab_enable_2nd",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_2nd",
+      "value": "Eyeful_v2-Individual.pt"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_classes_2nd",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_prompt_2nd",
+      "value": "__01.artist style/748_0.7-kuchi_0.8__, eyes, detailed eyes,  tsurime,"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_negative_prompt_2nd",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_confidence_2nd",
+      "value": 0.3
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_min_ratio_2nd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_max_ratio_2nd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_k_2nd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_filter_method_2nd",
+      "value": "Area"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_x_offset_2nd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_y_offset_2nd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_dilate_erode_2nd",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_merge_invert_2nd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_blur_2nd",
+      "value": 8
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_2nd",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_padding_2nd",
+      "value": 32
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_noise_multiplier_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_noise_multiplier_2nd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_sampler_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_sampler_2nd",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_scheduler_2nd",
+      "value": "Use same scheduler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_inpaint_width_height_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_width_2nd",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_height_2nd",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_steps_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_steps_2nd",
+      "value": 20
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_cfg_scale_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_cfg_scale_2nd",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_checkpoint_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_checkpoint_2nd",
+      "value": "krea2TurboNSFWAIO_v10 [c40a220593]"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_vae_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_vae_2nd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_restore_face_2nd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_denoising_strength_2nd",
+      "value": 0.2
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_module_2nd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_model_2nd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_weight_2nd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_guidance_start_end_2nd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_tab_enable_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_3rd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_classes_3rd",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_prompt_3rd",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_negative_prompt_3rd",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_confidence_3rd",
+      "value": 0.3
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_min_ratio_3rd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_max_ratio_3rd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_k_3rd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_filter_method_3rd",
+      "value": "Area"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_x_offset_3rd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_y_offset_3rd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_dilate_erode_3rd",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_merge_invert_3rd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_blur_3rd",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_3rd",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_padding_3rd",
+      "value": 32
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_noise_multiplier_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_noise_multiplier_3rd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_sampler_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_sampler_3rd",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_scheduler_3rd",
+      "value": "Use same scheduler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_inpaint_width_height_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_width_3rd",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_height_3rd",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_steps_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_steps_3rd",
+      "value": 20
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_cfg_scale_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_cfg_scale_3rd",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_checkpoint_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_checkpoint_3rd",
+      "value": "krea2TurboNSFWAIO_v10 [c40a220593]"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_vae_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_vae_3rd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_restore_face_3rd",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_denoising_strength_3rd",
+      "value": 0.5
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_module_3rd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_model_3rd",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_weight_3rd",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_guidance_start_end_3rd",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_tab_enable_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_4th",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_model_classes_4th",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_prompt_4th",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_negative_prompt_4th",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_confidence_4th",
+      "value": 0.3
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_min_ratio_4th",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_max_ratio_4th",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_k_4th",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_filter_method_4th",
+      "value": "Area"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_x_offset_4th",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_y_offset_4th",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_dilate_erode_4th",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_merge_invert_4th",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_mask_blur_4th",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_4th",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_only_masked_padding_4th",
+      "value": 32
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_noise_multiplier_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_noise_multiplier_4th",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_sampler_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_sampler_4th",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_scheduler_4th",
+      "value": "Use same scheduler"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_inpaint_width_height_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_width_4th",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_inpaint_height_4th",
+      "value": 512
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_steps_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_steps_4th",
+      "value": 20
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_cfg_scale_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_cfg_scale_4th",
+      "value": 4
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_checkpoint_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_checkpoint_4th",
+      "value": "krea2TurboNSFWAIO_v10 [c40a220593]"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_use_vae_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_vae_4th",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_restore_face_4th",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_denoising_strength_4th",
+      "value": 0.5
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_module_4th",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_model_4th",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_weight_4th",
+      "value": 1
+    },
+    {
+      "id": "script_txt2img_adetailer_ad_controlnet_guidance_start_end_4th",
+      "value": 0
+    },
+    {
+      "id": "input-accordion-0-checkbox",
+      "value": false
+    },
+    {
+      "id": "component-498",
+      "value": ""
+    },
+    {
+      "id": "component-499",
+      "value": 0
+    },
+    {
+      "id": "component-500",
+      "value": 0.33
+    },
+    {
+      "id": "component-503",
+      "value": 2
+    },
+    {
+      "id": "component-504",
+      "value": 0
+    },
+    {
+      "id": "component-505",
+      "value": 0
+    },
+    {
+      "id": "component-508",
+      "value": "Use same sampler"
+    },
+    {
+      "id": "component-510",
+      "value": 0
+    },
+    {
+      "id": "component-513",
+      "value": ""
+    },
+    {
+      "id": "component-514",
+      "value": ""
+    },
+    {
+      "id": "sddp-dynamic-prompts-enabled",
+      "value": true
+    },
+    {
+      "id": "sddp-is-combinatorial",
+      "value": false
+    },
+    {
+      "id": "sddp-max-generations",
+      "value": 0
+    },
+    {
+      "id": "sddp-combinatorial-times",
+      "value": 1
+    },
+    {
+      "id": "sddp-is-magicprompt",
+      "value": false
+    },
+    {
+      "id": "component-529",
+      "value": 100
+    },
+    {
+      "id": "component-530",
+      "value": 0.7
+    },
+    {
+      "id": "sddp-magic-prompt-model",
+      "value": "Gustavosta/MagicPrompt-Stable-Diffusion"
+    },
+    {
+      "id": "sddp-magic-prompt-blocklist-regex",
+      "value": ""
+    },
+    {
+      "id": "sddp-is-feelinglucky",
+      "value": false
+    },
+    {
+      "id": "sddp-is-attention-grabber",
+      "value": false
+    },
+    {
+      "id": "component-537",
+      "value": 1.1
+    },
+    {
+      "id": "component-538",
+      "value": 1.5
+    },
+    {
+      "id": "sddp-disable-negative-prompt",
+      "value": true
+    },
+    {
+      "id": "sddp-enable-jinja-templates",
+      "value": false
+    },
+    {
+      "id": "sddp-unlink-seed-from-prompt",
+      "value": false
+    },
+    {
+      "id": "sddp-is-fixed-seed",
+      "value": false
+    },
+    {
+      "id": "sddp-write-raw-template",
+      "value": false
+    },
+    {
+      "id": "sddp-no-image-generation",
+      "value": false
+    },
+    {
+      "id": "sddp-write-prompts",
+      "value": false
+    },
+    {
+      "id": "component-568",
+      "value": 0
+    },
+    {
+      "id": "component-570",
+      "value": true
+    },
+    {
+      "id": "uuid_84a5500ebe4242a3a00f2fb7a195dee9",
+      "value": ""
+    },
+    {
+      "id": "uuid_968b0be85cd0474c93ec4171dd2aa0ff",
+      "value": ""
+    },
+    {
+      "id": "component-586",
+      "value": ""
+    },
+    {
+      "id": "component-587",
+      "value": 0.4
+    },
+    {
+      "id": "component-590",
+      "value": 0.075
+    },
+    {
+      "id": "component-591",
+      "value": "Rectangle"
+    },
+    {
+      "id": "uuid_2c92b9850fe44077b927cdeda9569a4e",
+      "value": ""
+    },
+    {
+      "id": "component-600",
+      "value": ""
+    },
+    {
+      "id": "uuid_49bd46825a114df3b61f8d327b150f07",
+      "value": ""
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_canvas_width",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_canvas_height",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_enable_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_pixel_perfect_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_preprocessor_preview_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_mask_upload_checkbox",
+      "value": false
+    },
+    {
+      "id": "component-628",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_type_filter_radio",
+      "value": "All"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_preprocessor_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_model_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_control_weight_slider",
+      "value": 1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_control_step_slider",
+      "value": 0
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_preprocessor_resolution_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_threshold_A_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_threshold_B_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_control_mode_radio",
+      "value": "Balanced"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_resize_mode_radio",
+      "value": "Crop and Resize"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-0_controlnet_hr_option_radio",
+      "value": "Both"
+    },
+    {
+      "id": "component-659",
+      "value": 0
+    },
+    {
+      "id": "component-661",
+      "value": true
+    },
+    {
+      "id": "uuid_983ca279d59f4e3c9828d83c8d805ebf",
+      "value": ""
+    },
+    {
+      "id": "uuid_43f9f77a75f04cfc938c5cf345fea50b",
+      "value": ""
+    },
+    {
+      "id": "component-677",
+      "value": ""
+    },
+    {
+      "id": "component-678",
+      "value": 0.4
+    },
+    {
+      "id": "component-681",
+      "value": 0.075
+    },
+    {
+      "id": "component-682",
+      "value": "Rectangle"
+    },
+    {
+      "id": "uuid_bff470cbdb014272a99655f3dce418b3",
+      "value": ""
+    },
+    {
+      "id": "component-691",
+      "value": ""
+    },
+    {
+      "id": "uuid_621041f03c3747abb5c6ed7da0af13f2",
+      "value": ""
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_canvas_width",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_canvas_height",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_enable_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_pixel_perfect_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_preprocessor_preview_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_mask_upload_checkbox",
+      "value": false
+    },
+    {
+      "id": "component-719",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_type_filter_radio",
+      "value": "All"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_preprocessor_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_model_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_control_weight_slider",
+      "value": 1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_control_step_slider",
+      "value": 0
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_preprocessor_resolution_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_threshold_A_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_threshold_B_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_control_mode_radio",
+      "value": "Balanced"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_resize_mode_radio",
+      "value": "Crop and Resize"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-1_controlnet_hr_option_radio",
+      "value": "Both"
+    },
+    {
+      "id": "component-750",
+      "value": 0
+    },
+    {
+      "id": "component-752",
+      "value": true
+    },
+    {
+      "id": "uuid_dc96e637f7cf4c5b9cce5235ef661af5",
+      "value": ""
+    },
+    {
+      "id": "uuid_7ca9e5317d444e459a2175e966af10cd",
+      "value": ""
+    },
+    {
+      "id": "component-768",
+      "value": ""
+    },
+    {
+      "id": "component-769",
+      "value": 0.4
+    },
+    {
+      "id": "component-772",
+      "value": 0.075
+    },
+    {
+      "id": "component-773",
+      "value": "Rectangle"
+    },
+    {
+      "id": "uuid_65ea9f97fff440fda2c46096255d897e",
+      "value": ""
+    },
+    {
+      "id": "component-782",
+      "value": ""
+    },
+    {
+      "id": "uuid_1f46188cdd1a409896d118fbfa5b3d50",
+      "value": ""
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_canvas_width",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_canvas_height",
+      "value": 512
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_enable_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_pixel_perfect_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_preprocessor_preview_checkbox",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_mask_upload_checkbox",
+      "value": false
+    },
+    {
+      "id": "component-810",
+      "value": false
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_type_filter_radio",
+      "value": "All"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_preprocessor_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_model_dropdown",
+      "value": "None"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_control_weight_slider",
+      "value": 1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_control_step_slider",
+      "value": 0
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_preprocessor_resolution_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_threshold_A_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_threshold_B_slider",
+      "value": -1
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_control_mode_radio",
+      "value": "Balanced"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_resize_mode_radio",
+      "value": "Crop and Resize"
+    },
+    {
+      "id": "txt2img_controlnet_ControlNet-2_controlnet_hr_option_radio",
+      "value": "Both"
+    },
+    {
+      "id": "component-842",
+      "value": false
+    },
+    {
+      "id": "component-843",
+      "value": false
+    },
+    {
+      "id": "input-accordion-1-checkbox",
+      "value": false
+    },
+    {
+      "id": "component-858",
+      "value": ""
+    },
+    {
+      "id": "input-accordion-2-checkbox",
+      "value": false
+    },
+    {
+      "id": "component-865",
+      "value": 0.25
+    },
+    {
+      "id": "component-866",
+      "value": 6
+    },
+    {
+      "id": "component-869",
+      "value": 0.5
+    },
+    {
+      "id": "component-870",
+      "value": 2
+    },
+    {
+      "id": "component-872",
+      "value": 0
+    },
+    {
+      "id": "component-874",
+      "value": ""
+    },
+    {
+      "id": "component-875",
+      "value": 0.9
+    },
+    {
+      "id": "component-878",
+      "value": ""
+    },
+    {
+      "id": "component-888",
+      "value": "0"
+    },
+    {
+      "id": "script_list",
+      "value": "None"
+    },
+    {
+      "id": "script_txt2img_prompt_matrix_put_at_start",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_prompt_matrix_different_seeds",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_prompt_matrix_margin_size",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_prompt_matrix_prompt_type",
+      "value": "positive"
+    },
+    {
+      "id": "script_txt2img_prompt_matrix_variations_delimiter",
+      "value": "comma"
+    },
+    {
+      "id": "script_txt2img_prompts_from_file_or_textbox_checkbox_iterate",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_prompts_from_file_or_textbox_checkbox_iterate_batch",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_prompts_from_file_or_textbox_prompt_position",
+      "value": "start"
+    },
+    {
+      "id": "script_txt2img_prompts_from_file_or_textbox_prompt_txt",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_xyz_plot_x_type",
+      "value": "Seed"
+    },
+    {
+      "id": "script_txt2img_xyz_plot_x_values",
+      "value": ""
+    },
+    {
+      "id": "component-916",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_xyz_plot_y_type",
+      "value": "Nothing"
+    },
+    {
+      "id": "script_txt2img_xyz_plot_y_values",
+      "value": ""
+    },
+    {
+      "id": "component-922",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_xyz_plot_z_type",
+      "value": "Nothing"
+    },
+    {
+      "id": "script_txt2img_xyz_plot_z_values",
+      "value": ""
+    },
+    {
+      "id": "component-928",
+      "value": ""
+    },
+    {
+      "id": "script_txt2img_xyz_plot_row_count",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_xyz_plot_margin_size",
+      "value": 0
+    },
+    {
+      "id": "script_txt2img_xyz_plot_draw_legend",
+      "value": true
+    },
+    {
+      "id": "script_txt2img_xyz_plot_no_fixed_seeds",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_vary_seeds_x",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_vary_seeds_y",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_vary_seeds_z",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_include_lone_images",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_include_sub_grids",
+      "value": false
+    },
+    {
+      "id": "script_txt2img_xyz_plot_csv_mode",
+      "value": false
+    }
+  ]
+}

@@ -18,23 +18,106 @@ function forgeEnGenSettingsFindInput(root) {
     if (!root) {
         return null;
     }
-    if (typeof forgeEnOutputBrowserFindInput === "function") {
-        return forgeEnOutputBrowserFindInput(root);
+    // Prefer safe controls; never return file/button (setting file.value throws InvalidStateError).
+    const candidates = root.querySelectorAll(
+        "textarea, input[type='number'], input[type='text'], input[type='search'], input[type='range'], input[type='checkbox'], input[type='radio'], input:not([type]), select",
+    );
+    for (let i = 0; i < candidates.length; i++) {
+        const el = candidates[i];
+        const t = (el.type || "").toLowerCase();
+        if (t === "file" || t === "button" || t === "submit" || t === "reset" || t === "image") {
+            continue;
+        }
+        if (el.tagName === "INPUT" && el.disabled && t === "file") {
+            continue;
+        }
+        return el;
     }
+    return null;
+}
+
+function forgeEnGenSettingsIsGradioDropdown(root, input) {
     return (
-        root.querySelector("textarea") ||
-        root.querySelector("input[type='number']") ||
-        root.querySelector("input:not([type='hidden'])") ||
-        root.querySelector("select")
+        !!input &&
+        input.tagName === "INPUT" &&
+        input.type !== "checkbox" &&
+        input.type !== "number" &&
+        input.type !== "range" &&
+        input.type !== "radio" &&
+        (input.getAttribute("role") === "listbox" ||
+            !!root.querySelector(".wrap .secondary-wrap input"))
     );
 }
 
-function forgeEnGenSettingsApplyUpdate(update) {
+function forgeEnGenSettingsAfterSvelteFlush(fn) {
+    // Svelte schedules reactive updates on a microtask; wait two ticks so
+    // dropdown options / active_index settle before we commit.
+    return new Promise(function (resolve) {
+        queueMicrotask(function () {
+            queueMicrotask(function () {
+                resolve(fn());
+            });
+        });
+    });
+}
+
+function forgeEnGenSettingsCommitGradioDropdown(root, input, wantValue) {
+    const text = String(wantValue == null ? "" : wantValue);
+    input.focus();
+    input.value = text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    return forgeEnGenSettingsAfterSvelteFlush(function () {
+        let clicked = false;
+        const items = root.querySelectorAll("ul.options li[data-index]");
+        for (let i = 0; i < items.length; i++) {
+            const li = items[i];
+            const label = String(li.getAttribute("aria-label") || "").trim();
+            const content = String(li.textContent || "")
+                .replace(/^\s*✓\s*/, "")
+                .trim();
+            if (label === text || content === text) {
+                li.dispatchEvent(
+                    new MouseEvent("mousedown", {
+                        bubbles: true,
+                        cancelable: true,
+                    }),
+                );
+                clicked = true;
+                break;
+            }
+        }
+        if (!clicked) {
+            input.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "Enter",
+                    code: "Enter",
+                    keyCode: 13,
+                    which: 13,
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+        }
+        return true;
+    });
+}
+
+async function forgeEnGenSettingsApplyUpdate(update) {
     const root = gradioApp().getElementById(update.id);
     if (!root) {
         return false;
     }
     if (update.value === undefined) {
+        return false;
+    }
+
+    // Skip upload / media roots entirely.
+    if (
+        root.querySelector(
+            "input[type='file'], .image-container, .upload-container, canvas, video, .gallery",
+        )
+    ) {
         return false;
     }
 
@@ -61,28 +144,57 @@ function forgeEnGenSettingsApplyUpdate(update) {
         }
     }
 
-    if (typeof forgeEnOutputBrowserApplyGradioUpdate === "function") {
-        return forgeEnOutputBrowserApplyGradioUpdate(update);
-    }
-
     const input = forgeEnGenSettingsFindInput(root);
     if (!input) {
         return false;
     }
-    if (input.type === "checkbox") {
-        input.checked = !!update.value;
-    } else if (Array.isArray(update.value)) {
-        if (input.tagName === "SELECT" && input.multiple) {
-            const want = new Set(update.value.map(String));
-            Array.from(input.options).forEach(function (opt) {
-                opt.selected = want.has(opt.value);
-            });
-        } else {
-            input.value = update.value.join(",");
-        }
-    } else {
-        input.value = String(update.value);
+    if (input.type === "file") {
+        return false;
     }
+
+    // Gradio Dropdown: setting input.value only updates display text; commit
+    // via option click / Enter so internal `value` reaches Python.
+    if (
+        forgeEnGenSettingsIsGradioDropdown(root, input) &&
+        !Array.isArray(update.value)
+    ) {
+        await forgeEnGenSettingsCommitGradioDropdown(root, input, update.value);
+        return true;
+    }
+
+    try {
+        if (input.type === "checkbox") {
+            input.checked = !!update.value;
+        } else if (Array.isArray(update.value)) {
+            if (input.tagName === "SELECT" && input.multiple) {
+                const want = new Set(update.value.map(String));
+                Array.from(input.options).forEach(function (opt) {
+                    opt.selected = want.has(opt.value);
+                });
+            } else {
+                input.value = update.value.join(",");
+            }
+        } else {
+            input.value = String(update.value);
+        }
+    } catch (err) {
+        return false;
+    }
+
+    const isPromptTextarea =
+        input.tagName === "TEXTAREA" &&
+        /_(prompt|neg_prompt)$/.test(String(update.id || root.id || ""));
+    const api = window.genLayoutPromptCaret;
+    if (isPromptTextarea && api) {
+        api.applyEdit(input, {
+            value: input.value,
+            caret: input.value.length,
+            caretEnd: input.value.length,
+            scroll: "none",
+        });
+        return true;
+    }
+
     if (typeof updateInput === "function") {
         updateInput(input);
     } else {
@@ -220,19 +332,20 @@ function forgeEnGenSettingsSyncPromptTags(tabname) {
     }
 }
 
-function forgeEnGenSettingsApplyFields(tabname, fields) {
+async function forgeEnGenSettingsApplyFields(tabname, fields) {
     if (!Array.isArray(fields)) {
         return 0;
     }
     let applied = 0;
-    fields.forEach(function (update) {
+    for (let i = 0; i < fields.length; i++) {
+        const update = fields[i];
         if (!update || !update.id) {
-            return;
+            continue;
         }
-        if (forgeEnGenSettingsApplyUpdate(update)) {
+        if (await forgeEnGenSettingsApplyUpdate(update)) {
             applied += 1;
         }
-    });
+    }
     forgeEnGenSettingsSyncPromptTags(tabname);
     return applied;
 }
@@ -645,7 +758,10 @@ async function forgeEnGenSettingsOnLoad(tabname) {
             forgeEnGenSettingsSetStatus(bar, String(data.error), true);
             return;
         }
-        const applied = forgeEnGenSettingsApplyFields(tabname, data.fields || []);
+        const applied = await forgeEnGenSettingsApplyFields(
+            tabname,
+            data.fields || [],
+        );
         if (combo) {
             combo.value = name;
         }
